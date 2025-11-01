@@ -20,6 +20,37 @@ wheels/
 .installed.cfg
 *.egg
 
+# Python cache
+*.pyc
+*.pyo
+*.pyd
+
+# Backups
+*.backup
+*.bak
+*~
+
+# Documentation/Reports (keep only README.md)
+*_SUMMARY.md
+*_REPORT.md
+*_IMPLEMENTATION*.md
+PR*.md
+REDESIGN*.md
+REFACTOR*.md
+
+# Test files
+test_*.py
+diagnostic.*
+repo_tree.txt
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif
+!assets/**/*.png
+!assets/**/*.jpg
+
 # PyQt
 *.ui~
 
@@ -35,7 +66,6 @@ nhat_ky_xu_ly.log
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store

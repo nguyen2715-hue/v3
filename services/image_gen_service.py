@@ -169,7 +169,7 @@ def generate_image_with_rate_limit(
             log_fn(msg)
     
     # Load API keys if not provided
-    if api_keys is None:
+    if not api_keys:
         from services.core.key_manager import get_all_keys, refresh
         refresh()
         api_keys = get_all_keys('google')
@@ -187,17 +187,6 @@ def generate_image_with_rate_limit(
         if aspect_ratio == "4:5":
             normalized_ratio = "3:4"
             log(f"[ASPECT RATIO] Normalized {aspect_ratio} to {normalized_ratio} for Imagen 4")
-    
-    # Get API keys from parameter or config
-    if api_keys is None or len(api_keys) == 0:
-        refresh()
-        api_keys = get_all_keys('google')
-    
-    if not api_keys or len(api_keys) == 0:
-        log("[ERROR] Không có Google API keys khả dụng")
-        return None
-    
-    log(f"[INFO] Sử dụng {len(api_keys)} API keys với rotation")
     
     # Call appropriate generation function with key rotation
     try:
@@ -260,17 +249,6 @@ def generate_image_with_rate_limit(
         else:
             log(f"[ERROR] Unsupported model: {model}")
             return None
-        
-        # Execute with intelligent rotation
-        log(f"[IMAGE GEN] Generating with {model} (aspect ratio: {normalized_ratio})...")
-        result = rotation_manager.execute_with_rotation(api_call_with_key)
-        
-        # Log final status
-        status = rotation_manager.get_status()
-        log(f"[STATUS] Keys: {status['available_keys']}/{status['total_keys']} available, "
-            f"{status['rate_limited_keys']} rate-limited")
-        
-        return result
         
     except Exception as e:
         log(f"[ERROR] Image generation failed: {str(e)[:200]}")
