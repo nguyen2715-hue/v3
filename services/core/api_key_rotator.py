@@ -61,9 +61,9 @@ class APIKeyRotator:
         last_error = None
         
         for idx, key in enumerate(self.keys):
-            # Exponential backoff: wait before trying next key (except first)
+            # Exponential backoff: 4s, 8s, 16s, 32s (increased from 2s, 4s, 8s, 16s)
             if idx > 0:
-                delay = 2 ** idx  # 2s, 4s, 8s, 16s...
+                delay = 4 * (2 ** (idx - 1))  # 4s, 8s, 16s, 32s...
                 # Cap at MAX_BACKOFF_SECONDS to avoid excessive waits
                 delay = min(delay, self.MAX_BACKOFF_SECONDS)
                 self._log(f"[BACKOFF] Waiting {delay}s before trying next key...")

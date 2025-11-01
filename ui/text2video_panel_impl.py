@@ -336,6 +336,7 @@ class _Worker(QObject):
                     # Success - try to download if auto_download enabled
                     url = (v.get('video_urls') or [None])[0]
                     if url and auto_download:
+                        self.log.emit(f"[AUTO-DOWNLOAD] Đang tải video cảnh {card['scene']} copy {card['copy']}...")
                         fn=f"{title}_canh_{card['scene']}_video_{card['copy']}_{quality}.mp4"
                         fp=os.path.join(dir_videos, fn)
                         try:
@@ -348,7 +349,7 @@ class _Worker(QObject):
                                 self.job_card.emit(card)
                                 sc = card['scene']
                                 cp = card['copy']
-                                self.log.emit(f"[INFO] Đã tải video cảnh {sc} copy {cp}")
+                                self.log.emit(f"[SUCCESS] ✓ Đã tải video cảnh {sc} copy {cp}: {fp}")
                             else:
                                 scene_id = card['scene']
                                 copy_id = card['copy']

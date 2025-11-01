@@ -114,16 +114,8 @@ def generate_image_gemini(prompt: str, timeout: int = None, retry_delay: float =
 
 # New implementation: Intelligent rate-limited image generation with API key rotation
 def generate_image_with_rate_limit(
-    prompt: str,
-    api_keys: list = None,
-    model: str = "gemini",
     aspect_ratio: str = "1:1",
-    size: str = "1024x1024",
-    delay_before: float = 0.0,
-    rate_limit_delay: float = 10.0,
-    max_calls_per_minute: int = 6,
-    logger=None,
-    log_callback=None
+    reference_images: list = None,
 ) -> Optional[bytes]:
     """
     Generate image with intelligent API key rotation and rate limiting
@@ -218,9 +210,7 @@ def generate_image_with_rate_limit(
                 
                 payload = {
                     "contents": [{
-                        "parts": [{
-                            "text": enhanced_prompt
-                        }]
+                        "parts": parts
                     }],
                     "generationConfig": generation_config
                 }

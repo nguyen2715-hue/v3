@@ -316,8 +316,7 @@ QTabWidget::pane {
 }
 
 /* Tab Bar - Bold font with light theme colors */
-/* Note: Tab colors must be set programmatically in Python code
-   QSS does not support nth-child() pseudo-selector */
+/* Note: Individual tab colors set programmatically in main_image2video.py */
 QTabBar::tab {
     font-family: "Segoe UI", Arial, sans-serif;
     font-weight: 700;

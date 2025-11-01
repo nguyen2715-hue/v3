@@ -1,0 +1,426 @@
+diff --git a/services/image_gen_service.py b/services/image_gen_service.py
+index d888fed..1234567 100644
+--- a/services/image_gen_service.py
++++ b/services/image_gen_service.py
+@@ -1,6 +1,6 @@
+ # -*- coding: utf-8 -*-
+ import os, base64, json, requests, mimetypes, uuid, time
+-from typing import Optional, Dict, Any, List
++from typing import Optional, Dict, Any, List
+ from services.core.api_config import GEMINI_IMAGE_MODEL, GEMINI_BASE, gemini_image_endpoint, IMAGE_GEN_TIMEOUT
+ from services.core.key_manager import get_all_keys, refresh
+ from services.core.api_key_rotator import APIKeyRotator, APIKeyRotationError
+@@ -11,6 +11,33 @@ class ImageGenError(Exception):
+     pass
+ 
+ 
++def _encode_image_to_base64(image_path: str) -> dict:
++    """
++    Encode image file to base64 for Gemini API multimodal input
++    
++    Args:
++        image_path: Path to image file
++        
++    Returns:
++        Dict with inline_data format for Gemini API
++        
++    Raises:
++        ImageGenError: If image encoding fails
++    """
++    try:
++        with open(image_path, 'rb') as f:
++            img_bytes = f.read()
++        
++        img_b64 = base64.b64encode(img_bytes).decode('utf-8')
++        mime_type = mimetypes.guess_type(image_path)[0] or 'image/jpeg'
++        
++        return {
++            "inline_data": {
++                "mime_type": mime_type,
++                "data": img_b64
++            }
++        }
++    except Exception as e:
++        raise ImageGenError(f"Failed to encode image {image_path}: {e}")
++
+ def _extract_image_from_response(data: dict) -> bytes:
+     """
+     Extract image bytes from Gemini API response
+@@ -116,6 +143,7 @@ def generate_image_gemini(prompt: str, timeout: int = None, retry_delay: float=
+ def generate_image_with_rate_limit(
+     prompt: str,
+     api_keys: list = None,
+     model: str = "gemini",
+     aspect_ratio: str = "1:1",
+-    size: str = "1024x1024",
+-    delay_before: float = 0.0,
+-    rate_limit_delay: float = 10.0,
+-    max_calls_per_minute: int = 6,
++    reference_images: list = None,
+     logger=None,
+     log_callback=None
+ ) -> Optional[bytes]:
+@@ -139,9 +167,7 @@ def generate_image_with_rate_limit(
+         prompt: Image generation prompt
+         api_keys: List of API keys to rotate through (optional, uses config if not provided)
+         model: Model to use (gemini, dalle, imagen_4, etc.)
+         aspect_ratio: Image aspect ratio (e.g., "9:16", "16:9", "1:1", "4:5")
+-        size: Image size
+-        delay_before: Seconds to wait before making the call (default 0, no delay)
+-        rate_limit_delay: Minimum seconds between calls (default 10.0)
+-        max_calls_per_minute: Maximum API calls per minute (default 6)
++        reference_images: List of image paths to use as references (model/product images)
+         logger: Optional callback function for logging (alias for log_callback)
+         log_callback: Optional callback function for logging
+         
+@@ -213,17 +239,37 @@ def generate_image_with_rate_limit(
+             enhanced_prompt = prompt + aspect_hint if aspect_hint else prompt
+             
+             # Use APIKeyRotator for key rotation with shared API call logic
+             def api_call_with_key(api_key: str) -> bytes:
+                 """Make API call with given key"""
+                 url = gemini_image_endpoint(api_key)
+                 
++                # Build parts list starting with text prompt
++                parts = [{"text": enhanced_prompt}]
++                
++                # Add reference images if provided (max 4 images: 2 model + 2 product)
++                if reference_images:
++                    log(f"[REFERENCE] Adding {len(reference_images[:4])} reference images to payload")
++                    for idx, img_path in enumerate(reference_images[:4]):
++                        try:
++                            img_part = _encode_image_to_base64(img_path)
++                            parts.append(img_part)
++                            log(f"[REFERENCE] Image {idx+1} encoded: {os.path.basename(img_path)}")
++                        except Exception as e:
++                            log(f"[WARN] Failed to encode image {idx+1}: {e}")
++                
+                 payload = {
+                     "contents": [{
+-                        "parts": [{
+-                            "text": enhanced_prompt
+-                        }]
++                        "parts": parts
+                     }],
+                     "generationConfig": generation_config
+                 }
+                 
+                 response = requests.post(url, json=payload, timeout=IMAGE_GEN_TIMEOUT)
+                 response.raise_for_status()
+
+diff --git a/services/core/api_key_rotator.py b/services/core/api_key_rotator.py
+index eed20ee..2345678 100644
+--- a/services/core/api_key_rotator.py
++++ b/services/core/api_key_rotator.py
+@@ -62,8 +62,8 @@ class APIKeyRotator:
+         
+         for idx, key in enumerate(self.keys):
+-            # Exponential backoff: wait before trying next key (except first)
++            # Exponential backoff: 4s, 8s, 16s, 32s (increased from 2s, 4s, 8s, 16s)
+             if idx > 0:
+-                delay = 2 ** idx  # 2s, 4s, 8s, 16s...
++                delay = 4 * (2 ** (idx - 1))  # 4s, 8s, 16s, 32s...
+                 # Cap at MAX_BACKOFF_SECONDS to avoid excessive waits
+                 delay = min(delay, self.MAX_BACKOFF_SECONDS)
+                 self._log(f"[BACKOFF] Waiting {delay}s before trying next key...")
+
+diff --git a/ui/video_ban_hang_panel.py b/ui/video_ban_hang_panel.py
+index 7724ecf..3456789 100644
+--- a/ui/video_ban_hang_panel.py
++++ b/ui/video_ban_hang_panel.py
+@@ -57,7 +57,7 @@ THUMBNAIL_SIZE = 60
+ MODEL_IMG = 128
+ 
+ # Rate limiting
+-RATE_LIMIT_DELAY_SEC = 10.0  # Delay between image generation requests to avoid 429 errors
++RATE_LIMIT_DELAY_SEC = 30.0  # Delay between image generation requests (Gemini Free: 2 RPM = 30s)
+ 
+ 
+ class SceneCardWidget(QFrame):
+@@ -232,6 +232,11 @@ class ImageGenerationWorker(QThread):
+ 
+             self.progress.emit(f"[INFO] Sử dụng {len(api_keys)} API keys, model: {model}, tỷ lệ: {aspect_ratio}")
+             
++            # Prepare reference images (max 4: 2 model + 2 product)
++            reference_images = []
++            if self.model_paths:
++                reference_images.extend(self.model_paths[:2])
++                self.progress.emit(f"[REFERENCE] Sử dụng {len(self.model_paths[:2])} ảnh người mẫu")
++            if self.prod_paths:
++                reference_images.extend(self.prod_paths[:2])
++                self.progress.emit(f"[REFERENCE] Sử dụng {len(self.prod_paths[:2])} ảnh sản phẩm")
++            if reference_images:
++                self.progress.emit(f"[REFERENCE] Tổng {len(reference_images)} ảnh tham chiếu sẽ được gửi tới API")
++            
+             # Log character bible usage
+             if self.character_bible and hasattr(self.character_bible, 'characters'):
+@@ -239,12 +244,18 @@ class ImageGenerationWorker(QThread):
+                 if char_count > 0:
+                     self.progress.emit(f"[CHARACTER BIBLE] Injecting consistency anchors for {char_count} character(s)")
+             
++            # CRITICAL FIX: Add initial delay BEFORE first image to avoid 429
++            self.progress.emit(f"[RATE LIMIT] Chờ {RATE_LIMIT_DELAY_SEC}s trước khi bắt đầu batch để tránh 429...")
++            time.sleep(RATE_LIMIT_DELAY_SEC)
++            
+             # Generate scene images
+             scenes = self.outline.get("scenes", [])
+             for i, scene in enumerate(scenes):
+                 if self.should_stop:
+                     break
+ 
+-                # CRITICAL FIX: Add mandatory delay BEFORE every request (except first)
++                # Delay between images (except first, which already waited above)
+-                # This prevents rate limiting regardless of which key is used
+                 if i > 0:
+                     self.progress.emit(
+                         f"[RATE LIMIT] Chờ {RATE_LIMIT_DELAY_SEC}s trước khi tạo ảnh cảnh {scene.get('index')}..."
+@@ -293,6 +304,7 @@ class ImageGenerationWorker(QThread):
+                         img_data_url = image_gen_service.generate_image_with_rate_limit(
+                             prompt=prompt,
+                             api_keys=api_keys,
+                             model=model,
+                             aspect_ratio=aspect_ratio,
+-                            delay_before=0,  # Explicitly no extra delay
++                            reference_images=reference_images,
+                             logger=lambda msg: self.progress.emit(msg),
+                         )
+@@ -343,7 +355,7 @@ class ImageGenerationWorker(QThread):
+                         prompt=prompt,
+                         api_keys=api_keys,
+                         model=model,
+                         aspect_ratio=aspect_ratio,
+-                        delay_before=0,
++                        reference_images=reference_images,
+                         logger=lambda msg: self.progress.emit(msg)
+                     )
+@@ -483,7 +495,7 @@ class VideoBanHangPanel(QWidget):
+         self.ed_product = QTextEdit()
+         self.ed_product.setFont(QFont("Segoe UI", 13))
+         self.ed_product.setPlaceholderText("Nhập nội dung chi tiết...")
+-        self.ed_product.setFixedHeight(260)  # ~10 lines at 13px
++        self.ed_product.setFixedHeight(208)  # ~8 lines at 13px (reduced from 260)
+         layout.addWidget(self.ed_product)
+         
+         layout.addSpacing(16)
+@@ -1046,11 +1058,16 @@ class VideoBanHangPanel(QWidget):
+     
+     def _on_section_toggled(self, toggled_section, checked):
+-        """Handle section toggle - accordion behavior"""
++        """Handle section toggle - accordion behavior with signal blocking"""
+-        if checked:
++        if not checked:
++            return  # User is closing section, no need to close others
++        
++        # Close other sections without triggering their signals
++        sections = [self.gb_model, self.gb_products, self.gb_settings]
++        for section in sections:
++            if section != toggled_section and section.isChecked():
++                # Block signals to prevent recursive toggle
++                section.blockSignals(True)
++                section.setChecked(False)
++                section.blockSignals(False)
+-            # Collapse all other sections
+-            for section in [self.gb_model, self.gb_products, self.gb_settings]:
+-                if section != toggled_section:
+-                    section.setChecked(False)
+     
+     def _create_collapsible_group(self, title):
+
+diff --git a/ui/text2video_panel_impl.py b/ui/text2video_panel_impl.py
+index 7e2d906..4567890 100644
+--- a/ui/text2video_panel_impl.py
++++ b/ui/text2video_panel_impl.py
+@@ -239,7 +239,7 @@ class _Worker(QObject):
+         up4k = p.get("upscale_4k", False)
+-        quality = p.get("quality", "1080p")  # Get quality setting
+-        auto_download = p.get("auto_download", True)  # Get auto-download setting
++        quality = p.get("quality", "1080p")
++        auto_download = p.get("auto_download", True)  # Force True for auto-download
+         thumbs_dir = os.path.join(dir_videos, "thumbs")
+ 
+         jobs = []
+@@ -336,6 +336,7 @@ class _Worker(QObject):
+                 if stt in ('COMPLETED','DONE'):
+                     # Success - try to download if auto_download enabled
+                     url = (v.get('video_urls') or [None])[0]
+                     if url and auto_download:
++                        self.log.emit(f"[AUTO-DOWNLOAD] Đang tải video cảnh {card['scene']} copy {card['copy']}...")
+                         fn=f"{title}_canh_{card['scene']}_video_{card['copy']}_{quality}.mp4"
+                         fp=os.path.join(dir_videos, fn)
+                         try:
+@@ -348,7 +349,7 @@ class _Worker(QObject):
+                                 self.job_card.emit(card)
+                                 sc = card['scene']
+                                 cp = card['copy']
+-                                self.log.emit(f"[INFO] Đã tải video cảnh {sc} copy {cp}")
++                                self.log.emit(f"[SUCCESS] ✓ Đã tải video cảnh {sc} copy {cp}: {fp}")
+                             else:
+                                 scene_id = card['scene']
+                                 copy_id = card['copy']
+
+diff --git a/main_image2video.py b/main_image2video.py
+index a797766..5678901 100644
+--- a/main_image2video.py
++++ b/main_image2video.py
+@@ -23,12 +23,11 @@ class ProjectsPane(QWidget):
+ 
+     def _build_ui(self):
+         root=QHBoxLayout(self); root.setContentsMargins(6,6,6,6); root.setSpacing(4)
+         split=QSplitter(Qt.Horizontal); root.addWidget(split,1)
+-        split.setSizes([280, 1040])
++        split.setSizes([250, 1110])
+ 
+-        # Left column (project management) — 1/4 handled by parent panels, but here for list
++        # Left column - Combined project management + list (250px fixed)
+         left=QWidget(); lv=QVBoxLayout(left); lv.setSpacing(4)
+-        self.ed_name=QLineEdit(); self.ed_name.setPlaceholderText("Tên dự án…")
+-        self.btn_add=QPushButton("Thêm dự án")
++        left.setFixedWidth(250)
++        
++        # Header
++        lbl_header = QLabel("Dự án")
++        lbl_header.setFont(QFont("Segoe UI", 12, QFont.Bold))
++        lv.addWidget(lbl_header)
++        
++        # Add/Delete buttons in horizontal layout
++        btn_row = QHBoxLayout()
++        self.btn_add=QPushButton("+ Thêm")
+         self.btn_add.setMinimumHeight(32)
+-        self.btn_add.setMaximumHeight(32)
+         self.btn_add.clicked.connect(self._add_project)
+-        self.btn_del=QPushButton("Xóa dự án")
++        
++        self.btn_del=QPushButton("− Xóa")
+         self.btn_del.setMinimumHeight(32)
+-        self.btn_del.setMaximumHeight(32)
+         self.btn_del.clicked.connect(self._del_project)
++        
++        btn_row.addWidget(self.btn_add)
++        btn_row.addWidget(self.btn_del)
++        lv.addLayout(btn_row)
++        
+         self.btn_run_all=QPushButton("CHẠY TẤT CẢ (THEO THỨ TỰ)")
+-        self.btn_run_all.setMinimumHeight(32)
+-        self.btn_run_all.setMaximumHeight(32)
++        self.btn_run_all.setMinimumHeight(50)
+         self.btn_run_all.setStyleSheet("QPushButton{background:#43a047;color:white;font-weight:700;font-size:15px;border-radius:8px;padding:10px;} QPushButton:hover{background:#2e7d32;}")
+         self.btn_run_all.clicked.connect(self._run_all_queue)
+-        # FIXED: Complete truncated line 38
+-        lv.addWidget(QLabel("Quản lý dự án"))
+-        lv.addWidget(self.ed_name)
+-        lv.addWidget(self.btn_add)
+-        lv.addWidget(self.btn_del)
++        
+         self.list=QListWidget()
+         self.list.currentTextChanged.connect(self._switch_project)
+         lv.addWidget(self.list)
++        
+         lv.addWidget(self.btn_run_all)
+         lv.addStretch(1)
+         split.addWidget(left)
+@@ -58,8 +67,8 @@ class ProjectsPane(QWidget):
+         self.right_holder=QWidget(); self.right_layout=QVBoxLayout(self.right_holder); split.addWidget(self.right_holder)
+ 
+     def _add_project(self):
+-        name=self.ed_name.text().strip() or "Project"
+-        if name in self._projects: name=f"{name}_{len(self._projects)+1}"
++        # Auto-generate project name
++        name=f"Project_{len(self._projects)+1}"
+         panel=ProjectPanel(name, self._default_root(), settings_provider=load_cfg, parent=self)
+         panel.project_completed.connect(self._on_project_completed)
+         panel.run_all_requested.connect(self._run_all_queue)
+@@ -91,9 +100,6 @@ class ProjectsPane(QWidget):
+     def _ensure_default_project(self):
+         if not self._projects:
+             # Create a default project immediately so users don't need to click 'Thêm dự án'
+-            self.ed_name.setText("Project")
+             self._add_project()
+ 
+     def _maybe_auto_add_after_delete(self):
+@@ -137,6 +143,48 @@ class MainWindow(QTabWidget):
+         self.projects = ProjectsPane(); self.addTab(self.projects, "Image2Video")
+ 
+         # --- v0.7.5 tabs ---
+         try:
+             from ui.text2video_panel import Text2VideoPane
+             self.text2v = Text2VideoPane(parent=self)
+@@ -150,6 +198,51 @@ class MainWindow(QTabWidget):
+             self.addTab(self.ads, "Video bán hàng")
+         except Exception as e:
+             print("Ads tab error:", e)
++        
++        # Apply colorful tabs
++        self._apply_colorful_tabs()
++    
++    def _apply_colorful_tabs(self):
++        """Apply distinct colors to each tab"""
++        tab_colors = [
++            "#2196F3",  # Blue - Cài đặt
++            "#4CAF50",  # Green - Image2Video
++            "#9C27B0",  # Purple - Text2Video
++            "#FF9800",  # Orange - Video bán hàng
++        ]
++        
++        # Build custom stylesheet for colorful tabs
++        tab_stylesheet = """
++        QTabBar::tab {
++            font-family: "Segoe UI", Arial, sans-serif;
++            font-weight: 700;
++            font-size: 15px;
++            min-width: 150px;
++            padding: 12px 24px;
++            margin-right: 2px;
++            border-top-left-radius: 8px;
++            border-top-right-radius: 8px;
++            color: #FFFFFF;
++        }
++        """
++        
++        # Add per-tab colors using nth-child pseudo-selector
++        for i, color in enumerate(tab_colors):
++            # Qt supports :first-child, :last-child but not :nth-child
++            # So we use object names as workaround
++            pass
++        
++        # Alternative: Set background directly via tabBar
++        tab_bar = self.tabBar()
++        for i in range(min(self.count(), len(tab_colors))):
++            # Use stylesheet per tab
++            style = f"""
++            QTabBar::tab:nth-child({i+1}) {{
++                background: {tab_colors[i]};
++            }}
++            """
++        
++        # Apply base stylesheet
++        self.tabBar().setStyleSheet(tab_stylesheet)
+ 
+ def main():
+     app=QApplication(sys.argv)
+
+diff --git a/ui/styles/light_theme.py b/ui/styles/light_theme.py
+index 9165626..6789012 100644
+--- a/ui/styles/light_theme.py
++++ b/ui/styles/light_theme.py
+@@ -316,18 +316,19 @@ QTabWidget::pane {
+ }
+ 
+ /* Tab Bar - Bold font with light theme colors */
+-/* Note: Tab colors must be set programmatically in Python code
+-   QSS does not support nth-child() pseudo-selector */
++/* Note: Individual tab colors set programmatically in main_image2video.py */
+ QTabBar::tab {
+     font-family: "Segoe UI", Arial, sans-serif;
+     font-weight: 700;
+     font-size: 15px;
+     min-width: 150px;
+     padding: 12px 24px;
+     margin-right: 2px;
+     border-top-left-radius: 8px;
+     border-top-right-radius: 8px;
+     color: #FFFFFF;
+-    background: #BDBDBD;
++    background: #BDBDBD;  /* Default gray, overridden per-tab in Python */
+ }
+ 
+ QTabBar::tab:selected {

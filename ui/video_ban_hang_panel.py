@@ -57,7 +57,7 @@ THUMBNAIL_SIZE = 60
 MODEL_IMG = 128
 
 # Rate limiting
-RATE_LIMIT_DELAY_SEC = 10.0  # Delay between image generation requests to avoid 429 errors
+RATE_LIMIT_DELAY_SEC = 30.0  # Delay between image generation requests (Gemini Free: 2 RPM = 30s)
 
 
 class SceneCardWidget(QFrame):
@@ -232,11 +232,26 @@ class ImageGenerationWorker(QThread):
 
             self.progress.emit(f"[INFO] Sử dụng {len(api_keys)} API keys, model: {model}, tỷ lệ: {aspect_ratio}")
             
+            # Prepare reference images (max 4: 2 model + 2 product)
+            reference_images = []
+            if self.model_paths:
+                reference_images.extend(self.model_paths[:2])
+                self.progress.emit(f"[REFERENCE] Sử dụng {len(self.model_paths[:2])} ảnh người mẫu")
+            if self.prod_paths:
+                reference_images.extend(self.prod_paths[:2])
+                self.progress.emit(f"[REFERENCE] Sử dụng {len(self.prod_paths[:2])} ảnh sản phẩm")
+            if reference_images:
+                self.progress.emit(f"[REFERENCE] Tổng {len(reference_images)} ảnh tham chiếu sẽ được gửi tới API")
+            
             # Log character bible usage
             if self.character_bible and hasattr(self.character_bible, 'characters'):
                 char_count = len(self.character_bible.characters)
                 if char_count > 0:
                     self.progress.emit(f"[CHARACTER BIBLE] Injecting consistency anchors for {char_count} character(s)")
+            
+            # CRITICAL FIX: Add initial delay BEFORE first image to avoid 429
+            self.progress.emit(f"[RATE LIMIT] Chờ {RATE_LIMIT_DELAY_SEC}s trước khi bắt đầu batch để tránh 429...")
+            time.sleep(RATE_LIMIT_DELAY_SEC)
             
             # Generate scene images
             scenes = self.outline.get("scenes", [])
@@ -296,7 +311,7 @@ class ImageGenerationWorker(QThread):
                             api_keys=api_keys,
                             model=model,
                             aspect_ratio=aspect_ratio,
-                            delay_before=0,  # Explicitly no extra delay
+                            reference_images=reference_images,
                             logger=lambda msg: self.progress.emit(msg),
                         )
 
@@ -344,7 +359,7 @@ class ImageGenerationWorker(QThread):
                         api_keys=api_keys,
                         model=model,
                         aspect_ratio=aspect_ratio,
-                        delay_before=0,
+                        reference_images=reference_images,
                         logger=lambda msg: self.progress.emit(msg)
                     )
 
@@ -483,7 +498,7 @@ class VideoBanHangPanel(QWidget):
         self.ed_product = QTextEdit()
         self.ed_product.setFont(QFont("Segoe UI", 13))
         self.ed_product.setPlaceholderText("Nhập nội dung chi tiết...")
-        self.ed_product.setFixedHeight(260)  # ~10 lines at 13px
+        self.ed_product.setFixedHeight(208)  # ~8 lines at 13px (reduced from 260)
         layout.addWidget(self.ed_product)
         
         layout.addSpacing(16)
@@ -1045,12 +1060,18 @@ class VideoBanHangPanel(QWidget):
         self.lb_scenes.setText(f"Số cảnh: {n}")
     
     def _on_section_toggled(self, toggled_section, checked):
-        """Handle section toggle - accordion behavior"""
-        if checked:
-            # Collapse all other sections
-            for section in [self.gb_model, self.gb_products, self.gb_settings]:
-                if section != toggled_section:
-                    section.setChecked(False)
+        """Handle section toggle - accordion behavior with signal blocking"""
+        if not checked:
+            return  # User is closing section, no need to close others
+        
+        # Close other sections without triggering their signals
+        sections = [self.gb_model, self.gb_products, self.gb_settings]
+        for section in sections:
+            if section != toggled_section and section.isChecked():
+                # Block signals to prevent recursive toggle
+                section.blockSignals(True)
+                section.setChecked(False)
+                section.blockSignals(False)
     
     def _create_collapsible_group(self, title):
         """Create collapsible group box"""
