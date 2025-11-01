@@ -169,7 +169,7 @@ def generate_image_with_rate_limit(
             log_fn(msg)
     
     # Load API keys if not provided
-    if api_keys is None:
+    if not api_keys:
         from services.core.key_manager import get_all_keys, refresh
         refresh()
         api_keys = get_all_keys('google')
