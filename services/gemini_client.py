@@ -15,7 +15,10 @@ class GeminiClient:
         if not self.keys: raise MissingAPIKey("Chưa nhập Google API Key trong Cài đặt.")
         random.shuffle(self.keys); self.rr=0; self.model=model or GEMINI_TEXT_MODEL
     def _next_key(self): k=self.keys[self.rr%len(self.keys)]; self.rr+=1; return k
-    def _endpoint(self, key): return gemini_text_endpoint(key) if self.model == GEMINI_TEXT_MODEL else f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={key}"
+    def _endpoint(self, key): 
+        if self.model == GEMINI_TEXT_MODEL:
+            return gemini_text_endpoint(key)
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={key}"
     def generate(self, system_text: str, user_text: str, timeout: int = 180)->str:
         last=None
         for i in range(5):

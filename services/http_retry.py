@@ -3,22 +3,6 @@ import time, random, requests
 from typing import Dict, Any, Tuple
 
 
-# Optional overrides from user config (non-breaking)
-try:
-    from utils import config as _cfg_mod  # type: ignore
-    _cfg = getattr(_cfg_mod, "load", lambda: {})() if hasattr(_cfg_mod, "load") else {}
-    _res = _cfg.get("resilience", {}) if isinstance(_cfg, dict) else {}
-    RESILIENCE_OVERRIDES = {
-        "max_retries": _res.get("max_retries"),
-        "base_sleep": _res.get("base_sleep"),
-        "backoff_factor": _res.get("backoff_factor"),
-        "jitter": _res.get("jitter"),
-        "timeout": _res.get("timeout"),
-    }
-except Exception:
-    RESILIENCE_OVERRIDES = {}
-
-
 def _knob(name:str, default):
     from services.core.config import load as load_config
     c = load_config()
