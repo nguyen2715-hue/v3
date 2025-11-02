@@ -77,9 +77,9 @@ class SceneResultCard(QFrame):
         content_layout = QVBoxLayout()
         content_layout.setSpacing(4)
 
-        # Title (blue, bold) - Issue 5a: Increased font size from 12px to 18px
+        # Title (blue, bold) - Font size set to 16px per requirement
         lbl_title = QLabel(f"Cảnh {self.scene_index}")
-        lbl_title.setFont(QFont("Segoe UI", 18, QFont.Bold))
+        lbl_title.setFont(QFont("Segoe UI", 16, QFont.Bold))
         lbl_title.setStyleSheet("color: #1976D2;")
         content_layout.addWidget(lbl_title)
 

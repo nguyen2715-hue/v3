@@ -136,7 +136,7 @@ def generate_image_with_rate_limit(
     - Smart rotation that skips rate-limited keys
     
     Args:
-        prompt: Image generation prompt
+        prompt: Image generation prompt (REQUIRED)
         api_keys: List of API keys to rotate through (optional, uses config if not provided)
         model: Model to use (gemini, dalle, imagen_4, etc.)
         aspect_ratio: Image aspect ratio (e.g., "9:16", "16:9", "1:1", "4:5")
