@@ -515,6 +515,7 @@ class VideoBanHangPanel(QWidget):
         
         # Model selector widget
         self.model_selector = ModelSelectorWidget(title="")
+        self.model_selector.setMinimumHeight(250)  # Ensure full visibility
         model_layout.addWidget(self.model_selector)
         
         # Add/Hide buttons
@@ -562,7 +563,9 @@ class VideoBanHangPanel(QWidget):
         
         # Settings form using QFormLayout for cleaner layout
         form = QFormLayout()
-        form.setSpacing(8)
+        form.setSpacing(12)  # Increased spacing for better readability
+        form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)  # Right-align labels
+        form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)  # Allow fields to expand
         
         def make_widget(widget_class, **kwargs):
             w = widget_class()
@@ -1091,6 +1094,10 @@ class VideoBanHangPanel(QWidget):
                 padding: 4px 12px;
                 background: white;
                 border-radius: 4px;
+            }
+            QGroupBox::indicator {
+                width: 18px;
+                height: 18px;
             }
             QGroupBox:checked {
                 border: 2px solid #2196F3;
