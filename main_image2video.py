@@ -1,6 +1,7 @@
 import sys, os
 from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLineEdit, QListWidget, QSplitter, QLabel, QTabWidget
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 try:
     from ui.project_panel import ProjectPanel
     from ui.settings_panel import SettingsPanel

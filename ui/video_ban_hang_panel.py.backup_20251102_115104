@@ -292,11 +292,11 @@ class ImageGenerationWorker(QThread):
 
                         # Use rate-limited generation with API key rotation
                         img_data_url = image_gen_service.generate_image_with_rate_limit(
-                            text=prompt,  # Fixed: 'prompt' → 'text'
+                            prompt=prompt,
                             api_keys=api_keys,
                             model=model,
                             aspect_ratio=aspect_ratio,
-                            delay_before=0,
+                            delay_before=0,  # Explicitly no extra delay
                             logger=lambda msg: self.progress.emit(msg),
                         )
 
@@ -340,7 +340,7 @@ class ImageGenerationWorker(QThread):
                 try:
                     # Use rate-limited generation with API key rotation
                     thumb_data_url = image_gen_service.generate_image_with_rate_limit(
-                        text=prompt,  # Fixed: 'prompt' → 'text'
+                        prompt=prompt,
                         api_keys=api_keys,
                         model=model,
                         aspect_ratio=aspect_ratio,
@@ -630,36 +630,6 @@ class VideoBanHangPanel(QWidget):
             "Tiếng Na Uy",
         ]
         self.cb_lang.addItems(LANGUAGES)
-        
-        # Mapping dictionary to convert display names to language codes
-        self.LANGUAGE_MAP = {
-            "Tiếng Việt": "vi",
-            "Tiếng Anh": "en",
-            "Tiếng Trung - Giản thể": "zh-CN",
-            "Tiếng Trung - Phồn thể": "zh-TW",
-            "Tiếng Nhật": "ja",
-            "Tiếng Hàn": "ko",
-            "Tiếng Thái": "th",
-            "Tiếng Indonesia": "id",
-            "Tiếng Mã Lai": "ms",
-            "Tiếng Tagalog": "tl",
-            "Tiếng Pháp": "fr",
-            "Tiếng Đức": "de",
-            "Tiếng Tây Ban Nha": "es",
-            "Tiếng Bồ Đào Nha": "pt",
-            "Tiếng Ý": "it",
-            "Tiếng Nga": "ru",
-            "Tiếng Ả Rập": "ar",
-            "Tiếng Hindi": "hi",
-            "Tiếng Bengal": "bn",
-            "Tiếng Punjab": "pa",
-            "Tiếng Thổ Nhĩ Kỳ": "tr",
-            "Tiếng Ba Lan": "pl",
-            "Tiếng Ukraina": "uk",
-            "Tiếng Hà Lan": "nl",
-            "Tiếng Thụy Điển": "sv",
-            "Tiếng Na Uy": "no",
-        }
         form.addWidget(QLabel("Ngôn ngữ:"), 2, 3)
         form.addWidget(self.cb_lang, 2, 4)
         

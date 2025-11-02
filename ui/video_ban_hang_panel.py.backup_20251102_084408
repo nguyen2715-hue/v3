@@ -53,11 +53,11 @@ FONT_INPUT = QFont()
 FONT_INPUT.setPixelSize(12)
 
 # Sizes
-THUMBNAIL_SIZE = 72
+THUMBNAIL_SIZE = 60
 MODEL_IMG = 128
 
 # Rate limiting
-RATE_LIMIT_DELAY_SEC = 10.0  # Delay between image generation requests to avoid 429 errors
+RATE_LIMIT_DELAY_SEC = 30.0  # Delay between image generation requests (Gemini Free: 2 RPM = 30s)
 
 
 class SceneCardWidget(QFrame):
@@ -232,11 +232,26 @@ class ImageGenerationWorker(QThread):
 
             self.progress.emit(f"[INFO] Sử dụng {len(api_keys)} API keys, model: {model}, tỷ lệ: {aspect_ratio}")
             
+            # Prepare reference images (max 4: 2 model + 2 product)
+            reference_images = []
+            if self.model_paths:
+                reference_images.extend(self.model_paths[:2])
+                self.progress.emit(f"[REFERENCE] Sử dụng {len(self.model_paths[:2])} ảnh người mẫu")
+            if self.prod_paths:
+                reference_images.extend(self.prod_paths[:2])
+                self.progress.emit(f"[REFERENCE] Sử dụng {len(self.prod_paths[:2])} ảnh sản phẩm")
+            if reference_images:
+                self.progress.emit(f"[REFERENCE] Tổng {len(reference_images)} ảnh tham chiếu sẽ được gửi tới API")
+            
             # Log character bible usage
             if self.character_bible and hasattr(self.character_bible, 'characters'):
                 char_count = len(self.character_bible.characters)
                 if char_count > 0:
                     self.progress.emit(f"[CHARACTER BIBLE] Injecting consistency anchors for {char_count} character(s)")
+            
+            # CRITICAL FIX: Add initial delay BEFORE first image to avoid 429
+            self.progress.emit(f"[RATE LIMIT] Chờ {RATE_LIMIT_DELAY_SEC}s trước khi bắt đầu batch để tránh 429...")
+            time.sleep(RATE_LIMIT_DELAY_SEC)
             
             # Generate scene images
             scenes = self.outline.get("scenes", [])
@@ -292,11 +307,11 @@ class ImageGenerationWorker(QThread):
 
                         # Use rate-limited generation with API key rotation
                         img_data_url = image_gen_service.generate_image_with_rate_limit(
-                            text=prompt,  # Fixed: 'prompt' → 'text'
+                            prompt=prompt,
                             api_keys=api_keys,
                             model=model,
                             aspect_ratio=aspect_ratio,
-                            delay_before=0,
+                            reference_images=reference_images,
                             logger=lambda msg: self.progress.emit(msg),
                         )
 
@@ -340,11 +355,11 @@ class ImageGenerationWorker(QThread):
                 try:
                     # Use rate-limited generation with API key rotation
                     thumb_data_url = image_gen_service.generate_image_with_rate_limit(
-                        text=prompt,  # Fixed: 'prompt' → 'text'
+                        prompt=prompt,
                         api_keys=api_keys,
                         model=model,
                         aspect_ratio=aspect_ratio,
-                        delay_before=0,
+                        reference_images=reference_images,
                         logger=lambda msg: self.progress.emit(msg)
                     )
 
@@ -425,7 +440,7 @@ class VideoBanHangPanel(QWidget):
 
         # LEFT COLUMN - EXACTLY 480px (was 400px, +80px for better spacing)
         self.left_widget = QWidget()
-        self.left_widget.setFixedWidth(460)
+        self.left_widget.setFixedWidth(480)
         left_layout = QVBoxLayout(self.left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
@@ -461,7 +476,7 @@ class VideoBanHangPanel(QWidget):
         self.ed_name.setFont(QFont("Segoe UI", 13))
         self.ed_name.setPlaceholderText("Nhập tên dự án...")
         self.ed_name.setText(svc.default_project_name())
-        self.ed_name.setMinimumHeight(42)
+        self.ed_name.setMinimumHeight(36)
         layout.addWidget(self.ed_name)
         
         # Idea input - 3 fixed lines, 13px
@@ -483,7 +498,7 @@ class VideoBanHangPanel(QWidget):
         self.ed_product = QTextEdit()
         self.ed_product.setFont(QFont("Segoe UI", 13))
         self.ed_product.setPlaceholderText("Nhập nội dung chi tiết...")
-        self.ed_product.setFixedHeight(130)  # 6 lines at 13px font  # ~10 lines at 13px
+        self.ed_product.setFixedHeight(208)  # ~8 lines at 13px (reduced from 260)
         layout.addWidget(self.ed_product)
         
         layout.addSpacing(16)
@@ -496,22 +511,23 @@ class VideoBanHangPanel(QWidget):
         self.gb_model.setChecked(False)  # Collapsed by default
         self.gb_model.toggled.connect(lambda checked: self._on_section_toggled(self.gb_model, checked))
         
-        # Create container widget for model section
-        self._model_container = QWidget()
-        model_content_layout = QVBoxLayout(self._model_container)
-        model_content_layout.setContentsMargins(0, 0, 0, 0)
-        model_content_layout.setSpacing(4)  # Tight spacing
+        model_layout = QVBoxLayout()
         
         # Model selector widget
         self.model_selector = ModelSelectorWidget(title="")
-        model_content_layout.addWidget(self.model_selector)
+        self.model_selector.setMinimumHeight(250)  # Ensure full visibility
+        model_layout.addWidget(self.model_selector)
         
-
+        # Add/Hide buttons
+        btn_row = QHBoxLayout()
+        btn_add = QPushButton("➕ Thêm người mẫu")
+        btn_add.clicked.connect(self.model_selector._add_model)
+        btn_row.addWidget(btn_add)
         
-        # Wrap container in GroupBox layout
-        model_layout = QVBoxLayout()
-        model_layout.addWidget(self._model_container)
-        self._model_container.setVisible(False)  # Hidden by default
+        btn_hide = QPushButton("➖ Ẩn người mẫu")
+        btn_hide.clicked.connect(lambda: self.gb_model.setChecked(False))
+        btn_row.addWidget(btn_hide)
+        model_layout.addLayout(btn_row)
         
         self.gb_model.setLayout(model_layout)
         layout.addWidget(self.gb_model)
@@ -522,25 +538,17 @@ class VideoBanHangPanel(QWidget):
         self.gb_products.setChecked(False)
         self.gb_products.toggled.connect(lambda checked: self._on_section_toggled(self.gb_products, checked))
         
-        # Create container widget
-        self._products_container = QWidget()
-        prod_content_layout = QVBoxLayout(self._products_container)
-        prod_content_layout.setContentsMargins(0, 0, 0, 0)
+        prod_layout = QVBoxLayout()
         
         btn_prod = QPushButton("📁 Chọn ảnh sản phẩm")
         btn_prod.setObjectName("btn_primary")
         btn_prod.setMinimumHeight(32)
         btn_prod.clicked.connect(self._pick_product_images)
-        prod_content_layout.addWidget(btn_prod)
+        prod_layout.addWidget(btn_prod)
         
         self.prod_thumb_container = QHBoxLayout()
         self.prod_thumb_container.setSpacing(4)
-        prod_content_layout.addLayout(self.prod_thumb_container)
-        
-        # Wrap in GroupBox layout
-        prod_layout = QVBoxLayout()
-        prod_layout.addWidget(self._products_container)
-        self._products_container.setVisible(False)  # Hidden by default
+        prod_layout.addLayout(self.prod_thumb_container)
         
         self.gb_products.setLayout(prod_layout)
         layout.addWidget(self.gb_products)
@@ -551,18 +559,13 @@ class VideoBanHangPanel(QWidget):
         self.gb_settings.setChecked(False)
         self.gb_settings.toggled.connect(lambda checked: self._on_section_toggled(self.gb_settings, checked))
         
-        # Create container widget for settings
-        self._settings_container = QWidget()
-        settings_content_layout = QVBoxLayout(self._settings_container)
-        settings_content_layout.setContentsMargins(0, 0, 0, 0)
+        settings_layout = QVBoxLayout()
         
-        # Settings form using QGridLayout for 2-column layout
-        form = QGridLayout()
-        form.setSpacing(8)
-        form.setColumnMinimumWidth(0, 110)  # Label column 1
-        form.setColumnMinimumWidth(2, 110)  # Label column 2
-        form.setColumnStretch(1, 1)  # Value column 1
-        form.setColumnStretch(3, 1)  # Value column 2
+        # Settings form using QFormLayout for cleaner layout
+        form = QFormLayout()
+        form.setSpacing(12)  # Increased spacing for better readability
+        form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)  # Right-align labels
+        form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)  # Allow fields to expand
         
         def make_widget(widget_class, **kwargs):
             w = widget_class()
@@ -572,131 +575,126 @@ class VideoBanHangPanel(QWidget):
                     getattr(w, k)(v) if callable(getattr(w, k)) else setattr(w, k, v)
             return w
         
-        # Row 0: Style columns
+        # Style
         self.cb_style = make_widget(QComboBox)
         self.cb_style.addItems(["Viral", "KOC Review", "Kể chuyện"])
-        form.addWidget(QLabel("Kịch bản:"), 0, 0)
-        form.addWidget(self.cb_style, 0, 1)
+        form.addRow("Phong cách KB:", self.cb_style)
         
+        # Image style
         self.cb_imgstyle = make_widget(QComboBox)
         self.cb_imgstyle.addItems(["Điện ảnh", "Hiện đại/Trendy", "Anime", "Hoạt hình 3D"])
-        form.addWidget(QLabel("Hình ảnh:"), 0, 3)
-        form.addWidget(self.cb_imgstyle, 0, 4)
+        form.addRow("Phong cách HA:", self.cb_imgstyle)
         
-        # Row 1: Model columns
+        # Script model
         self.cb_script_model = make_widget(QComboBox)
-        self.cb_script_model.addItems(["Gemini", "ChatGPT"])
-        form.addWidget(QLabel("Model KB:"), 1, 0)
-        form.addWidget(self.cb_script_model, 1, 1)
+        self.cb_script_model.addItems(["Gemini 2.5 Flash (mặc định)", "ChatGPT4 Turbo (tuỳ chọn)"])
+        form.addRow("Model KB:", self.cb_script_model)
         
+        # Image model
         self.cb_image_model = make_widget(QComboBox)
         self.cb_image_model.addItems(["Gemini", "Whisk"])
-        form.addWidget(QLabel("Tạo ảnh:"), 1, 3)
-        form.addWidget(self.cb_image_model, 1, 4)
+        form.addRow("Model tạo ảnh:", self.cb_image_model)
         
-        # Row 2: Voice | Language
+        # Voice
         self.ed_voice = make_widget(QLineEdit)
         self.ed_voice.setPlaceholderText("ElevenLabs VoiceID")
-        form.addWidget(QLabel("Lời thoại:"), 2, 0)
-        form.addWidget(self.ed_voice, 2, 1)
+        form.addRow("Lời thoại:", self.ed_voice)
         
+        # Language
         self.cb_lang = make_widget(QComboBox)
         LANGUAGES = [
-            "Tiếng Việt",
-            "Tiếng Anh",
-            "Tiếng Trung - Giản thể",
-            "Tiếng Trung - Phồn thể",
-            "Tiếng Nhật",
-            "Tiếng Hàn",
-            "Tiếng Thái",
-            "Tiếng Indonesia",
-            "Tiếng Mã Lai",
-            "Tiếng Tagalog",
-            "Tiếng Pháp",
-            "Tiếng Đức",
-            "Tiếng Tây Ban Nha",
-            "Tiếng Bồ Đào Nha",
-            "Tiếng Ý",
-            "Tiếng Nga",
-            "Tiếng Ả Rập",
-            "Tiếng Hindi",
-            "Tiếng Bengal",
-            "Tiếng Punjab",
-            "Tiếng Thổ Nhĩ Kỳ",
-            "Tiếng Ba Lan",
-            "Tiếng Ukraina",
-            "Tiếng Hà Lan",
-            "Tiếng Thụy Điển",
-            "Tiếng Na Uy",
+            "Tiếng Việt (Vietnamese)",
+            "Tiếng Anh (English)",
+            "Tiếng Trung - Giản thể (Chinese Simplified)",
+            "Tiếng Trung - Phồn thể (Chinese Traditional)",
+            "Tiếng Nhật (Japanese)",
+            "Tiếng Hàn (Korean)",
+            "Tiếng Thái (Thai)",
+            "Tiếng Indonesia (Indonesian)",
+            "Tiếng Mã Lai (Malay)",
+            "Tiếng Tagalog (Filipino)",
+            "Tiếng Pháp (French)",
+            "Tiếng Đức (German)",
+            "Tiếng Tây Ban Nha (Spanish)",
+            "Tiếng Bồ Đào Nha (Portuguese)",
+            "Tiếng Ý (Italian)",
+            "Tiếng Nga (Russian)",
+            "Tiếng Ả Rập (Arabic)",
+            "Tiếng Hindi (Hindi)",
+            "Tiếng Bengal (Bengali)",
+            "Tiếng Punjab (Punjabi)",
+            "Tiếng Thổ Nhĩ Kỳ (Turkish)",
+            "Tiếng Ba Lan (Polish)",
+            "Tiếng Ukraina (Ukrainian)",
+            "Tiếng Hà Lan (Dutch)",
+            "Tiếng Thụy Điển (Swedish)",
+            "Tiếng Na Uy (Norwegian)",
         ]
         self.cb_lang.addItems(LANGUAGES)
         
         # Mapping dictionary to convert display names to language codes
         self.LANGUAGE_MAP = {
-            "Tiếng Việt": "vi",
-            "Tiếng Anh": "en",
-            "Tiếng Trung - Giản thể": "zh-CN",
-            "Tiếng Trung - Phồn thể": "zh-TW",
-            "Tiếng Nhật": "ja",
-            "Tiếng Hàn": "ko",
-            "Tiếng Thái": "th",
-            "Tiếng Indonesia": "id",
-            "Tiếng Mã Lai": "ms",
-            "Tiếng Tagalog": "tl",
-            "Tiếng Pháp": "fr",
-            "Tiếng Đức": "de",
-            "Tiếng Tây Ban Nha": "es",
-            "Tiếng Bồ Đào Nha": "pt",
-            "Tiếng Ý": "it",
-            "Tiếng Nga": "ru",
-            "Tiếng Ả Rập": "ar",
-            "Tiếng Hindi": "hi",
-            "Tiếng Bengal": "bn",
-            "Tiếng Punjab": "pa",
-            "Tiếng Thổ Nhĩ Kỳ": "tr",
-            "Tiếng Ba Lan": "pl",
-            "Tiếng Ukraina": "uk",
-            "Tiếng Hà Lan": "nl",
-            "Tiếng Thụy Điển": "sv",
-            "Tiếng Na Uy": "no",
+            "Tiếng Việt (Vietnamese)": "vi",
+            "Tiếng Anh (English)": "en",
+            "Tiếng Trung - Giản thể (Chinese Simplified)": "zh-CN",
+            "Tiếng Trung - Phồn thể (Chinese Traditional)": "zh-TW",
+            "Tiếng Nhật (Japanese)": "ja",
+            "Tiếng Hàn (Korean)": "ko",
+            "Tiếng Thái (Thai)": "th",
+            "Tiếng Indonesia (Indonesian)": "id",
+            "Tiếng Mã Lai (Malay)": "ms",
+            "Tiếng Tagalog (Filipino)": "tl",
+            "Tiếng Pháp (French)": "fr",
+            "Tiếng Đức (German)": "de",
+            "Tiếng Tây Ban Nha (Spanish)": "es",
+            "Tiếng Bồ Đào Nha (Portuguese)": "pt",
+            "Tiếng Ý (Italian)": "it",
+            "Tiếng Nga (Russian)": "ru",
+            "Tiếng Ả Rập (Arabic)": "ar",
+            "Tiếng Hindi (Hindi)": "hi",
+            "Tiếng Bengal (Bengali)": "bn",
+            "Tiếng Punjab (Punjabi)": "pa",
+            "Tiếng Thổ Nhĩ Kỳ (Turkish)": "tr",
+            "Tiếng Ba Lan (Polish)": "pl",
+            "Tiếng Ukraina (Ukrainian)": "uk",
+            "Tiếng Hà Lan (Dutch)": "nl",
+            "Tiếng Thụy Điển (Swedish)": "sv",
+            "Tiếng Na Uy (Norwegian)": "no",
         }
-        form.addWidget(QLabel("Ngôn ngữ:"), 2, 3)
-        form.addWidget(self.cb_lang, 2, 4)
+        form.addRow("Ngôn ngữ:", self.cb_lang)
         
-        # Row 3: Duration | Videos
+        # Duration
         self.sp_duration = make_widget(QSpinBox)
         self.sp_duration.setRange(8, 1200)
         self.sp_duration.setSingleStep(8)
         self.sp_duration.setValue(32)
         self.sp_duration.setSuffix(" s")
         self.sp_duration.valueChanged.connect(self._update_scenes)
-        form.addWidget(QLabel("Thời lượng:"), 3, 0)
-        form.addWidget(self.sp_duration, 3, 1)
+        form.addRow("Thời lượng:", self.sp_duration)
         
+        # Videos count
         self.sp_videos = make_widget(QSpinBox)
         self.sp_videos.setRange(1, 4)
         self.sp_videos.setValue(1)
-        form.addWidget(QLabel("Số vid/cảnh:"), 3, 3)
-        form.addWidget(self.sp_videos, 3, 4)
+        form.addRow("Số video/cảnh:", self.sp_videos)
         
-        # Row 4: Ratio | Platform
+        # Aspect ratio
         self.cb_ratio = make_widget(QComboBox)
         self.cb_ratio.addItems(["9:16", "16:9", "1:1", "4:5"])
-        form.addWidget(QLabel("Tỉ lệ:"), 4, 0)
-        form.addWidget(self.cb_ratio, 4, 1)
+        form.addRow("Tỉ lệ:", self.cb_ratio)
         
+        # Social platform
         self.cb_social = make_widget(QComboBox)
         self.cb_social.addItems(["TikTok", "Facebook", "YouTube"])
-        form.addWidget(QLabel("Nền tảng:"), 4, 3)
-        form.addWidget(self.cb_social, 4, 4)
+        form.addRow("Nền tảng:", self.cb_social)
         
-        settings_content_layout.addLayout(form)
+        settings_layout.addLayout(form)
         
-        
-        # Wrap container in GroupBox layout
-        settings_layout = QVBoxLayout()
-        settings_layout.addWidget(self._settings_container)
-        self._settings_container.setVisible(False)  # Hidden by default
+        # Scene count label
+        self.lb_scenes = QLabel("Số cảnh: 4")
+        self.lb_scenes.setFont(FONT_LABEL)
+        self.lb_scenes.setStyleSheet("color: #424242; font-weight: 500; padding-top: 8px;")
+        settings_layout.addWidget(self.lb_scenes)
         
         self.gb_settings.setLayout(settings_layout)
         layout.addWidget(self.gb_settings)
@@ -1060,40 +1058,23 @@ class VideoBanHangPanel(QWidget):
         return gb
 
     def _update_scenes(self):
-        """Update scene count (removed label display)"""
-        # Scene count calculation only - label removed from UI
+        """Update scene count label"""
         n = max(1, math.ceil(self.sp_duration.value() / 8.0))
-        # self.lb_scenes removed - no need to update UI
+        self.lb_scenes.setText(f"Số cảnh: {n}")
     
     def _on_section_toggled(self, toggled_section, checked):
-        """Handle section toggle - accordion behavior with container widgets"""
-        # Get container for toggled section
-        container = None
-        if toggled_section == self.gb_model:
-            container = getattr(self, '_model_container', None)
-        elif toggled_section == self.gb_products:
-            container = getattr(self, '_products_container', None)
-        elif toggled_section == self.gb_settings:
-            container = getattr(self, '_settings_container', None)
+        """Handle section toggle - accordion behavior with signal blocking"""
+        if not checked:
+            return  # User is closing section, no need to close others
         
-        # Show/hide container
-        if container:
-            container.setVisible(checked)
-        
-        # Collapse other sections if opening this one
-        if checked:
-            sections = [
-                (self.gb_model, getattr(self, '_model_container', None)),
-                (self.gb_products, getattr(self, '_products_container', None)),
-                (self.gb_settings, getattr(self, '_settings_container', None))
-            ]
-            for section, section_container in sections:
-                if section != toggled_section and section.isChecked():
-                    section.blockSignals(True)
-                    section.setChecked(False)
-                    section.blockSignals(False)
-                    if section_container:
-                        section_container.setVisible(False)
+        # Close other sections without triggering their signals
+        sections = [self.gb_model, self.gb_products, self.gb_settings]
+        for section in sections:
+            if section != toggled_section and section.isChecked():
+                # Block signals to prevent recursive toggle
+                section.blockSignals(True)
+                section.setChecked(False)
+                section.blockSignals(False)
     
     def _create_collapsible_group(self, title):
         """Create collapsible group box"""
@@ -1113,6 +1094,10 @@ class VideoBanHangPanel(QWidget):
                 padding: 4px 12px;
                 background: white;
                 border-radius: 4px;
+            }
+            QGroupBox::indicator {
+                width: 18px;
+                height: 18px;
             }
             QGroupBox:checked {
                 border: 2px solid #2196F3;
