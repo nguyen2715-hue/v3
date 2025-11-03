@@ -253,17 +253,25 @@ class _Worker(QObject):
             rc = client.start_one(body, model_key, ratio, scene["prompt"], copies=copies, project_id=project_id)
 
             if rc > 0:
-                # Create cards for each expected copy
-                for copy_idx in range(1, copies+1):
+                # Only create cards for operations that actually exist in the API response
+                # The body dict is updated by client.start_one() with operation_names list
+                actual_count = len(body.get("operation_names", []))
+                
+                if actual_count < copies:
+                    self.log.emit(f"[WARN] Scene {scene_idx}: API returned {actual_count} operations but {copies} copies were requested")
+                
+                # Create cards only for videos that actually exist
+                for copy_idx in range(1, actual_count + 1):
                     card={"scene":scene_idx,"copy":copy_idx,"status":"PROCESSING","json":scene["prompt"],"url":"","path":"","thumb":"","dir":dir_videos}
                     self.job_card.emit(card)
 
-                    # Store card data separately to avoid unhashable dict issues
+                    # Store card data with copy index for operation name mapping
+                    # copy_idx is 1-based, so we'll use copy_idx-1 to index into operation_names (0-based)
                     job_info = {
                         'card': card,
                         'body': body,
                         'scene': scene_idx,
-                        'copy': copy_idx
+                        'copy': copy_idx  # 1-based index
                     }
                     jobs.append(job_info)
             else:
@@ -307,7 +315,9 @@ class _Worker(QObject):
             for job_info in jobs:
                 card = job_info['card']
                 job_dict = job_info['body']
-                # Get the first operation name for this job
+                copy_idx = job_info['copy']  # 1-based copy index
+                
+                # Get operation names list and map this copy to its operation
                 op_names = job_dict.get("operation_names", [])
                 if not op_names:
                     # No operation name - keep in queue for one more iteration in case it appears
@@ -325,8 +335,18 @@ class _Worker(QObject):
                         new_jobs.append(job_info)
                     continue
 
-                # Check status of first operation (for single copy jobs, there's only one)
-                op_name = op_names[0]
+                # Map copy index to the correct operation name (copy_idx is 1-based, array is 0-based)
+                op_index = copy_idx - 1
+                if op_index >= len(op_names):
+                    # This copy's operation doesn't exist - should not happen due to earlier check
+                    sc = card['scene']
+                    cp = card['copy']
+                    self.log.emit(f"[ERR] Cảnh {sc} video {cp}: operation index {op_index} out of bounds (only {len(op_names)} operations)")
+                    card["status"] = "FAILED"
+                    self.job_card.emit(card)
+                    continue
+                
+                op_name = op_names[op_index]
                 op_result = rs.get(op_name) or {}
                 
                 # VEO3 WORKING STRUCTURE: Check raw API response
