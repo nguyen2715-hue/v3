@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSlider,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -134,6 +135,82 @@ class Text2VideoPane(QWidget):
 
         colL.addWidget(download_group)
 
+        # Voice Settings Group (Voice Prosody & Speaking Style)
+        voice_group = QGroupBox("🎙️ Cài đặt giọng nói & ngữ điệu")
+        voice_layout = QVBoxLayout(voice_group)
+        voice_layout.setContentsMargins(8, 8, 8, 8)
+        voice_layout.setSpacing(6)
+
+        # Speaking style preset selector
+        style_row = QHBoxLayout()
+        style_row.addWidget(QLabel("Phong cách:"))
+        self.cb_speaking_style = QComboBox()
+        # Import style list from voice_options
+        from services.voice_options import get_style_list
+        for key, name, desc in get_style_list():
+            self.cb_speaking_style.addItem(name, key)
+        self.cb_speaking_style.setCurrentIndex(2)  # Default to "storytelling"
+        style_row.addWidget(self.cb_speaking_style, 1)
+        voice_layout.addLayout(style_row)
+
+        # Style description label
+        self.lbl_style_description = QLabel("Giọng sinh động, có cảm xúc, hấp dẫn")
+        self.lbl_style_description.setStyleSheet("font-size: 11px; color: #666; font-style: italic;")
+        self.lbl_style_description.setWordWrap(True)
+        voice_layout.addWidget(self.lbl_style_description)
+
+        # Speaking rate slider
+        rate_row = QHBoxLayout()
+        rate_row.addWidget(QLabel("Tốc độ nói:"))
+        self.slider_rate = QSlider(Qt.Horizontal)
+        self.slider_rate.setRange(50, 200)  # 0.5x to 2.0x (stored as 50-200)
+        self.slider_rate.setValue(100)  # Default 1.0x
+        self.slider_rate.setTickPosition(QSlider.TicksBelow)
+        self.slider_rate.setTickInterval(25)
+        rate_row.addWidget(self.slider_rate, 1)
+        self.lbl_rate = QLabel("1.0x")
+        self.lbl_rate.setMinimumWidth(50)
+        self.lbl_rate.setAlignment(Qt.AlignCenter)
+        rate_row.addWidget(self.lbl_rate)
+        voice_layout.addLayout(rate_row)
+
+        # Pitch slider
+        pitch_row = QHBoxLayout()
+        pitch_row.addWidget(QLabel("Cao độ giọng:"))
+        self.slider_pitch = QSlider(Qt.Horizontal)
+        self.slider_pitch.setRange(-5, 5)  # -5st to +5st
+        self.slider_pitch.setValue(0)  # Default 0st
+        self.slider_pitch.setTickPosition(QSlider.TicksBelow)
+        self.slider_pitch.setTickInterval(1)
+        pitch_row.addWidget(self.slider_pitch, 1)
+        self.lbl_pitch = QLabel("0st")
+        self.lbl_pitch.setMinimumWidth(50)
+        self.lbl_pitch.setAlignment(Qt.AlignCenter)
+        pitch_row.addWidget(self.lbl_pitch)
+        voice_layout.addLayout(pitch_row)
+
+        # Expressiveness slider
+        expr_row = QHBoxLayout()
+        expr_row.addWidget(QLabel("Biểu cảm:"))
+        self.slider_expressiveness = QSlider(Qt.Horizontal)
+        self.slider_expressiveness.setRange(0, 100)  # 0.0 to 1.0 (stored as 0-100)
+        self.slider_expressiveness.setValue(50)  # Default 0.5
+        self.slider_expressiveness.setTickPosition(QSlider.TicksBelow)
+        self.slider_expressiveness.setTickInterval(10)
+        expr_row.addWidget(self.slider_expressiveness, 1)
+        self.lbl_expressiveness = QLabel("0.5")
+        self.lbl_expressiveness.setMinimumWidth(50)
+        self.lbl_expressiveness.setAlignment(Qt.AlignCenter)
+        expr_row.addWidget(self.lbl_expressiveness)
+        voice_layout.addLayout(expr_row)
+
+        # Apply to all scenes checkbox
+        self.cb_apply_voice_all = QCheckBox("☑ Áp dụng cho tất cả cảnh")
+        self.cb_apply_voice_all.setChecked(True)
+        voice_layout.addWidget(self.cb_apply_voice_all)
+
+        colL.addWidget(voice_group)
+
         # Row 6: Single auto button + Stop button (PR#6: Part B #7-8)
         hb = QHBoxLayout()
         self.btn_auto = QPushButton("⚡ Tạo video tự động (3 bước)")
@@ -249,6 +326,12 @@ class Text2VideoPane(QWidget):
         self.btn_generate_bible.clicked.connect(self._on_generate_bible)
         self.btn_change_folder.clicked.connect(self._on_change_folder)
 
+        # Voice controls wire up
+        self.cb_speaking_style.currentIndexChanged.connect(self._on_speaking_style_changed)
+        self.slider_rate.valueChanged.connect(self._on_rate_changed)
+        self.slider_pitch.valueChanged.connect(self._on_pitch_changed)
+        self.slider_expressiveness.valueChanged.connect(self._on_expressiveness_changed)
+
         # Keep worker reference
         self.worker = None
         self.thread = None
@@ -339,16 +422,20 @@ class Text2VideoPane(QWidget):
 
         # Part D: Get character bible for injection
         character_bible_basic = self._script_data.get("character_bible", []) if self._script_data else []
+        
+        # Get voice settings
+        voice_settings = self.get_voice_settings()
 
         for r in range(self.table.rowCount()):
             vi = self.table.item(r,1).text() if self.table.item(r,1) else ""
             tgt= self.table.item(r,2).text() if self.table.item(r,2) else vi
 
-            # Part D: Pass enhanced bible to build_prompt_json
+            # Part D: Pass enhanced bible and voice settings to build_prompt_json
             j=build_prompt_json(
                 r+1, vi, tgt, lang_code, ratio_key, style,
                 character_bible=character_bible_basic,
-                enhanced_bible=self._character_bible
+                enhanced_bible=self._character_bible,
+                voice_settings=voice_settings
             )
             scenes.append({"prompt": json.dumps(j, ensure_ascii=False, indent=2), "aspect": ratio})
 
@@ -432,10 +519,13 @@ class Text2VideoPane(QWidget):
                 lang_code=self.cb_out_lang.currentData()
                 # Part D: Will be enhanced with bible later when user generates it
                 character_bible_basic = data.get("character_bible", [])
+                # Get current voice settings
+                voice_settings = self.get_voice_settings()
                 j=build_prompt_json(
                     i, sc.get("prompt_vi","" ), sc.get("prompt_tgt","" ), lang_code,
                     self.cb_ratio.currentText(), self.cb_style.currentText(),
-                    character_bible=character_bible_basic
+                    character_bible=character_bible_basic,
+                    voice_settings=voice_settings
                 )
                 if prdir:
                     with open(os.path.join(prdir, f"scene_{i:02d}.json"), "w", encoding="utf-8") as f:
@@ -473,7 +563,8 @@ class Text2VideoPane(QWidget):
         vi = self.table.item(row,1).text() if self.table.item(row,1) else ""
         tgt= self.table.item(row,2).text() if self.table.item(row,2) else ""
         lang_code=self.cb_out_lang.currentData()
-        j=build_prompt_json(row+1, vi, tgt, lang_code, self.cb_ratio.currentText(), self.cb_style.currentText())
+        voice_settings = self.get_voice_settings()
+        j=build_prompt_json(row+1, vi, tgt, lang_code, self.cb_ratio.currentText(), self.cb_style.currentText(), voice_settings=voice_settings)
         from ui.prompt_viewer import PromptViewer
         dlg = PromptViewer(json.dumps(j, ensure_ascii=False, indent=2), None, self); dlg.exec_()
 
@@ -651,3 +742,77 @@ class Text2VideoPane(QWidget):
         except Exception as e:
             self._append_log(f"[ERR] Lỗi tạo Character Bible: {e}")
             QMessageBox.warning(self, "Lỗi", f"Không thể tạo Character Bible: {e}")
+
+    def _on_speaking_style_changed(self):
+        """Handle speaking style preset change"""
+        style_key = self.cb_speaking_style.currentData()
+        if not style_key:
+            return
+        
+        # Import voice options module
+        from services.voice_options import get_style_info, SPEAKING_STYLES
+        
+        # Update description
+        style_info = get_style_info(style_key)
+        self.lbl_style_description.setText(style_info["description"])
+        
+        # Update sliders to match preset
+        style_config = SPEAKING_STYLES[style_key]
+        
+        # Rate preset mapping: slow=75, medium=100, fast=125
+        rate_map = {"slow": 75, "medium": 100, "fast": 125}
+        preset_rate = rate_map.get(style_config["google_tts"]["rate"], 100)
+        self.slider_rate.setValue(preset_rate)
+        
+        # Pitch preset extraction
+        pitch_str = style_config["google_tts"]["pitch"]
+        import re
+        match = re.match(r'([+-]?\d+)st', pitch_str)
+        preset_pitch = int(match.group(1)) if match else 0
+        self.slider_pitch.setValue(preset_pitch)
+        
+        # Expressiveness from ElevenLabs style
+        preset_expr = int(style_config["elevenlabs"]["style"] * 100)
+        self.slider_expressiveness.setValue(preset_expr)
+
+    def _on_rate_changed(self, value):
+        """Handle speaking rate slider change"""
+        # Convert slider value (50-200) to multiplier (0.5-2.0)
+        multiplier = value / 100.0
+        self.lbl_rate.setText(f"{multiplier:.1f}x")
+
+    def _on_pitch_changed(self, value):
+        """Handle pitch slider change"""
+        # Display semitones
+        if value > 0:
+            self.lbl_pitch.setText(f"+{value}st")
+        elif value < 0:
+            self.lbl_pitch.setText(f"{value}st")
+        else:
+            self.lbl_pitch.setText("0st")
+
+    def _on_expressiveness_changed(self, value):
+        """Handle expressiveness slider change"""
+        # Convert slider value (0-100) to decimal (0.0-1.0)
+        decimal = value / 100.0
+        self.lbl_expressiveness.setText(f"{decimal:.1f}")
+
+    def get_voice_settings(self):
+        """Get current voice settings for video generation
+        
+        Returns:
+            Dictionary with voice prosody settings
+        """
+        style_key = self.cb_speaking_style.currentData() or "storytelling"
+        rate_multiplier = self.slider_rate.value() / 100.0
+        pitch_adjust = self.slider_pitch.value()
+        expressiveness = self.slider_expressiveness.value() / 100.0
+        apply_all = self.cb_apply_voice_all.isChecked()
+        
+        return {
+            "speaking_style": style_key,
+            "rate_multiplier": rate_multiplier,
+            "pitch_adjust": pitch_adjust,
+            "expressiveness": expressiveness,
+            "apply_to_all_scenes": apply_all
+        }

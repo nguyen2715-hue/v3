@@ -31,7 +31,7 @@ _VIDEO_MODELS = [
     "veo_3_1_i2v_xl_landscape",
 ]
 
-def build_prompt_json(scene_index:int, desc_vi:str, desc_tgt:str, lang_code:str, ratio_str:str, style:str, seconds:int=8, copies:int=1, resolution_hint:str=None, character_bible=None, enhanced_bible=None):
+def build_prompt_json(scene_index:int, desc_vi:str, desc_tgt:str, lang_code:str, ratio_str:str, style:str, seconds:int=8, copies:int=1, resolution_hint:str=None, character_bible=None, enhanced_bible=None, voice_settings=None):
     """
     Strict prompt JSON schema:
     - objective/persona/constraints/assets/hard_locks/character_details/setting_details/key_action/camera_direction/audio/graphics/negatives/generation
@@ -102,6 +102,23 @@ def build_prompt_json(scene_index:int, desc_vi:str, desc_tgt:str, lang_code:str,
     # Part D: NEVER truncate voiceover - prompt optimizer will handle this
     # if len(vo_text)>240: vo_text = vo_text[:240] + "…"
 
+    # Build voiceover config with prosody settings
+    voiceover_config = {
+        "language": lang_code or "vi",
+        "voice_hint": "neutral_narrative",
+        "pace": 1.0,
+        "text": vo_text
+    }
+    
+    # Add voice prosody settings if provided
+    if voice_settings:
+        voiceover_config.update({
+            "speaking_style": voice_settings.get("speaking_style", "storytelling"),
+            "rate_multiplier": voice_settings.get("rate_multiplier", 1.0),
+            "pitch_adjust": voice_settings.get("pitch_adjust", 0),
+            "expressiveness": voice_settings.get("expressiveness", 0.5)
+        })
+
     data = {
         "scene_id": f"s{scene_index:02d}",
         "objective": "Generate a short video clip for this scene based on screenplay and prompts.",
@@ -124,7 +141,7 @@ def build_prompt_json(scene_index:int, desc_vi:str, desc_tgt:str, lang_code:str,
         "key_action": (desc_tgt or desc_vi or "").strip(),
         "camera_direction": segments,
         "audio": {
-            "voiceover": { "language": lang_code or "vi", "voice_hint": "neutral_narrative", "pace": 1.0, "text": vo_text },
+            "voiceover": voiceover_config,
             "music_bed": "subtle, minimal, non-intrusive"
         },
         "graphics": {
