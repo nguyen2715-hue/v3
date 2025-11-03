@@ -206,9 +206,9 @@ class Text2VideoPane(QWidget):
         row1.addWidget(lbl_provider)
         self.cb_tts_provider = QComboBox()
         self.cb_tts_provider.setStyleSheet("font-size: 12px;")
-        from services.voice_options import get_provider_list
-        for provider_id, provider_name, icon in get_provider_list():
-            self.cb_tts_provider.addItem(f"{icon} {provider_name}", provider_id)
+        from services.voice_options import TTS_PROVIDERS
+        for provider_id, provider_name in TTS_PROVIDERS:
+            self.cb_tts_provider.addItem(provider_name, provider_id)
         row1.addWidget(self.cb_tts_provider, 1)
         row1.addSpacing(8)
         lbl_voice = QLabel("Voice:")
