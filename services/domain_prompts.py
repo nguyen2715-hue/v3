@@ -6,7 +6,7 @@ Data source: https://docs.google.com/spreadsheets/d/1ohiL6xOBbjC7La2iUdkjrVjG4IE
 Structure: Domain → Topics → Prompts (VI/EN)
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 # TODO: Future feature - Load from Google Sheets API or database
 # For now, data is hardcoded from the Google Sheet
@@ -114,12 +114,12 @@ def get_topics_for_domain(domain: str) -> List[str]:
 def get_system_prompt(domain: str, topic: str, language: str = "vi") -> str:
     """
     Get system prompt for a domain and topic
-    
+
     Args:
         domain: Domain name
         topic: Topic name
         language: Language code ("vi" or "en")
-    
+
     Returns:
         System prompt text
     """
@@ -131,50 +131,50 @@ def get_system_prompt(domain: str, topic: str, language: str = "vi") -> str:
 def build_expert_intro(domain: str, topic: str, language: str = "vi") -> str:
     """
     Build expert introduction line for script generation
-    
+
     Args:
         domain: Domain name
         topic: Topic name
         language: Language code ("vi" or "en")
-    
+
     Returns:
         Expert introduction text
     """
     system_prompt = get_system_prompt(domain, topic, language)
-    
+
     if language == "vi":
-        intro = f"""Tôi là chuyên gia {domain} chuyên về {topic}. 
-Tôi đã nhận ý tưởng từ bạn và sẽ biến nó thành 
-kịch bản video {topic} chuyên nghiệp theo yêu cầu của bạn. 
+        intro = f"""Tôi là chuyên gia {domain} chuyên về {topic}.
+Tôi đã nhận ý tưởng từ bạn và sẽ biến nó thành
+kịch bản video {topic} chuyên nghiệp theo yêu cầu của bạn.
 
 {system_prompt}
 
 Kịch bản như sau:"""
     else:
-        intro = f"""I am a {domain} expert specializing in {topic}. 
-I have received your idea and will transform it into 
-a professional {topic} video script according to your requirements. 
+        intro = f"""I am a {domain} expert specializing in {topic}.
+I have received your idea and will transform it into
+a professional {topic} video script according to your requirements.
 
 {system_prompt}
 
 The script is as follows:"""
-    
+
     return intro.strip()
 
 
 def load_domain_topics_from_source():
     """
     TODO: Future feature - Load domain topics from Google Sheets API or database
-    
+
     This is a placeholder for future dynamic loading functionality.
     Currently returns the hardcoded DOMAIN_TOPICS data.
-    
+
     Future implementation could:
     1. Connect to Google Sheets API
     2. Fetch latest data from the spreadsheet
     3. Cache the data locally
     4. Handle API errors gracefully
-    
+
     Returns:
         Domain topics dictionary
     """

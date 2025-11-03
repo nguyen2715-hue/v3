@@ -54,11 +54,11 @@ TTS_PROVIDERS = [
 def get_voices_for_provider(provider: str, language_code: str = "vi") -> List[Tuple[str, str]]:
     """
     Get available voices for a TTS provider
-    
+
     Args:
         provider: "google" or "elevenlabs"
         language_code: Language code (for Google TTS only)
-    
+
     Returns:
         List of (voice_id, display_name) tuples
     """
@@ -73,11 +73,11 @@ def get_voices_for_provider(provider: str, language_code: str = "vi") -> List[Tu
 def get_default_voice(provider: str, language_code: str = "vi") -> str:
     """
     Get default voice ID for a provider and language
-    
+
     Args:
         provider: "google" or "elevenlabs"
         language_code: Language code (for Google TTS only)
-    
+
     Returns:
         Default voice ID
     """
@@ -88,12 +88,12 @@ def get_default_voice(provider: str, language_code: str = "vi") -> str:
 def get_voice_config(provider: str, voice_id: str, language_code: str = "vi") -> Dict:
     """
     Get voice configuration for script generation
-    
+
     Args:
         provider: "google" or "elevenlabs"
         voice_id: Voice ID
         language_code: Language code
-    
+
     Returns:
         Dict with voice configuration
     """
