@@ -985,7 +985,7 @@ class Text2VideoPane(QWidget):
                 prompt = get_system_prompt(domain, topic)
                 if prompt:
                     preview = prompt[:200] + "..."
-                    # Preview removed - content not displayed
+                    self.txt_prompt_preview.setPlainText(preview)
             except Exception as e:
                 self._append_log(f"[ERR] {e}")
     
