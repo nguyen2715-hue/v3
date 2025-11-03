@@ -364,14 +364,23 @@ class _Worker(QObject):
                                     self.log.emit(f"[SUCCESS] ✓ Downloaded: {os.path.basename(fp)}")
                                 else:
                                     self.log.emit(f"[WARN] Download failed, will retry")
+                                    card["status"] = "DOWNLOAD_FAILED"
+                                    card["url"] = video_url
+                                    self.job_card.emit(card)
                                     new_jobs.append(job_info)
                             except Exception as e:
                                 self.log.emit(f"[ERR] Download error: {e}")
+                                card["status"] = "DOWNLOAD_FAILED"
+                                card["url"] = video_url
+                                self.job_card.emit(card)
                                 new_jobs.append(job_info)
                         
                         self.job_card.emit(card)
                     else:
-                        new_jobs.append(job_info)
+                        # Video marked successful but no URL - this is an error state
+                        self.log.emit(f"[ERR] Scene {scene} Copy {copy_num}: No video URL in response")
+                        card["status"] = "DONE_NO_URL"
+                        self.job_card.emit(card)
                 
                 elif status == 'MEDIA_GENERATION_STATUS_FAILED':
                     card["status"] = "FAILED"
