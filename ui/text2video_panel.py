@@ -269,6 +269,7 @@ class Text2VideoPane(QWidget):
         folder_row.addWidget(self.lbl_download_folder, 1)
         self.btn_change_folder = QPushButton("📁")
         self.btn_change_folder.setMaximumWidth(40)
+        self.btn_change_folder.setToolTip("Đổi thư mục tải về")
         folder_row.addWidget(self.btn_change_folder)
         download_layout.addLayout(folder_row)
 
