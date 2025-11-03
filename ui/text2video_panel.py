@@ -74,9 +74,11 @@ class Text2VideoPane(QWidget):
 
         # Row 2: Duration + Language
         row2 = QHBoxLayout()
+        row2.setSpacing(8)
         row2.addWidget(QLabel("<b>Thời lượng (s):</b>"))
         self.sp_duration = QSpinBox(); self.sp_duration.setRange(3, 3600); self.sp_duration.setValue(100)
         row2.addWidget(self.sp_duration,1)
+        row2.addSpacing(16)
         row2.addWidget(QLabel("<b>Ngôn ngữ:</b>"))
         self.cb_out_lang = QComboBox()
         for name, code in _LANGS: self.cb_out_lang.addItem(name, code)
@@ -85,9 +87,11 @@ class Text2VideoPane(QWidget):
 
         # Row 3: Aspect ratio + Videos per scene
         row3 = QHBoxLayout()
+        row3.setSpacing(8)
         row3.addWidget(QLabel("<b>Tỉ lệ:</b>"))
         self.cb_ratio = QComboBox(); self.cb_ratio.addItems(["16:9","9:16","1:1","4:5","21:9"])
         row3.addWidget(self.cb_ratio,1)
+        row3.addSpacing(16)
         row3.addWidget(QLabel("<b>Số video/cảnh:</b>"))
         self.sp_copies = QSpinBox(); self.sp_copies.setRange(1, 5); self.sp_copies.setValue(1)
         row3.addWidget(self.sp_copies,1)
@@ -105,43 +109,108 @@ class Text2VideoPane(QWidget):
         self.cb_upscale.setStyleSheet("font-size: 14px; font-weight: 700;")
         colL.addWidget(self.cb_upscale)
 
-        # Voice Settings Group
+        # Voice Settings Group (Consolidated)
         voice_group = QGroupBox("🎙️ Voice Settings")
         voice_layout = QVBoxLayout(voice_group)
-        voice_layout.setContentsMargins(8, 8, 8, 8)
+        voice_layout.setContentsMargins(6, 6, 6, 6)
         voice_layout.setSpacing(4)
 
-        # TTS Provider selection
-        provider_row = QHBoxLayout()
-        provider_row.addWidget(QLabel("TTS Provider:"))
+        # Row 1: Provider + Voice (2 columns)
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("Provider:"))
         self.cb_tts_provider = QComboBox()
         from services.voice_options import TTS_PROVIDERS
         for provider_id, provider_name in TTS_PROVIDERS:
             self.cb_tts_provider.addItem(provider_name, provider_id)
-        provider_row.addWidget(self.cb_tts_provider, 1)
-        voice_layout.addLayout(provider_row)
-
-        # Voice selection
-        voice_row = QHBoxLayout()
-        voice_row.addWidget(QLabel("Voice:"))
+        row1.addWidget(self.cb_tts_provider, 1)
+        row1.addSpacing(8)
+        row1.addWidget(QLabel("Voice:"))
         self.cb_voice = QComboBox()
-        voice_row.addWidget(self.cb_voice, 1)
-        voice_layout.addLayout(voice_row)
+        row1.addWidget(self.cb_voice, 1)
+        voice_layout.addLayout(row1)
 
-        # Custom voice input
-        custom_voice_row = QHBoxLayout()
-        custom_voice_row.addWidget(QLabel("Custom Voice:"))
+        # Row 2: Custom voice (full width)
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("Custom:"))
         self.ed_custom_voice = QLineEdit()
-        self.ed_custom_voice.setPlaceholderText("Optional - override with custom voice ID")
-        custom_voice_row.addWidget(self.ed_custom_voice, 1)
-        voice_layout.addLayout(custom_voice_row)
+        self.ed_custom_voice.setPlaceholderText("Override voice ID")
+        row2.addWidget(self.ed_custom_voice, 1)
+        voice_layout.addLayout(row2)
+
+        # Prosody section separator
+        voice_layout.addWidget(QLabel("<b>Ngữ điệu:</b>"))
+
+        # Row 3: Style preset (full width)
+        row3 = QHBoxLayout()
+        row3.addWidget(QLabel("Phong cách:"))
+        self.cb_speaking_style = QComboBox()
+        # Populate style list from voice_options
+        for key, name, desc in get_style_list():
+            self.cb_speaking_style.addItem(name, key)
+        self.cb_speaking_style.setCurrentIndex(2)  # Default to "storytelling"
+        row3.addWidget(self.cb_speaking_style, 1)
+        voice_layout.addLayout(row3)
+
+        # Style description (compact)
+        self.lbl_style_description = QLabel("Giọng sinh động, có cảm xúc, hấp dẫn")
+        self.lbl_style_description.setStyleSheet("font-size: 10px; color: #666;")
+        self.lbl_style_description.setMaximumHeight(20)
+        self.lbl_style_description.setWordWrap(True)
+        voice_layout.addWidget(self.lbl_style_description)
+
+        # Row 4: Rate + Pitch (2 columns)
+        row4 = QHBoxLayout()
+        row4.addWidget(QLabel("Tốc độ:"))
+        self.slider_rate = QSlider(Qt.Horizontal)
+        self.slider_rate.setRange(50, 200)  # 0.5x to 2.0x
+        self.slider_rate.setValue(100)  # Default 1.0x
+        self.slider_rate.setTickPosition(QSlider.TicksBelow)
+        self.slider_rate.setTickInterval(25)
+        row4.addWidget(self.slider_rate, 1)
+        self.lbl_rate = QLabel("1.0x")
+        self.lbl_rate.setMinimumWidth(40)
+        self.lbl_rate.setAlignment(Qt.AlignCenter)
+        row4.addWidget(self.lbl_rate)
+        row4.addSpacing(8)
+        row4.addWidget(QLabel("Cao độ:"))
+        self.slider_pitch = QSlider(Qt.Horizontal)
+        self.slider_pitch.setRange(-5, 5)  # -5st to +5st
+        self.slider_pitch.setValue(0)  # Default 0st
+        self.slider_pitch.setTickPosition(QSlider.TicksBelow)
+        self.slider_pitch.setTickInterval(1)
+        row4.addWidget(self.slider_pitch, 1)
+        self.lbl_pitch = QLabel("0st")
+        self.lbl_pitch.setMinimumWidth(40)
+        self.lbl_pitch.setAlignment(Qt.AlignCenter)
+        row4.addWidget(self.lbl_pitch)
+        voice_layout.addLayout(row4)
+
+        # Row 5: Expressiveness (full width)
+        row5 = QHBoxLayout()
+        row5.addWidget(QLabel("Biểu cảm:"))
+        self.slider_expressiveness = QSlider(Qt.Horizontal)
+        self.slider_expressiveness.setRange(0, 100)  # 0.0 to 1.0
+        self.slider_expressiveness.setValue(50)  # Default 0.5
+        self.slider_expressiveness.setTickPosition(QSlider.TicksBelow)
+        self.slider_expressiveness.setTickInterval(10)
+        row5.addWidget(self.slider_expressiveness, 1)
+        self.lbl_expressiveness = QLabel("0.5")
+        self.lbl_expressiveness.setMinimumWidth(40)
+        self.lbl_expressiveness.setAlignment(Qt.AlignCenter)
+        row5.addWidget(self.lbl_expressiveness)
+        voice_layout.addLayout(row5)
+
+        # Checkbox
+        self.cb_apply_voice_all = QCheckBox("Áp dụng tất cả cảnh")
+        self.cb_apply_voice_all.setChecked(True)
+        voice_layout.addWidget(self.cb_apply_voice_all)
 
         colL.addWidget(voice_group)
 
         # Domain & Topic Group
         domain_group = QGroupBox("🎯 Lĩnh vực & Chủ đề")
         domain_layout = QVBoxLayout(domain_group)
-        domain_layout.setContentsMargins(8, 8, 8, 8)
+        domain_layout.setContentsMargins(6, 6, 6, 6)
         domain_layout.setSpacing(4)
 
         # Domain selection
@@ -164,122 +233,46 @@ class Text2VideoPane(QWidget):
         topic_row.addWidget(self.cb_topic, 1)
         domain_layout.addLayout(topic_row)
 
-        # System prompt preview
-        domain_layout.addWidget(QLabel("📝 System Prompt Preview:"))
+        # System prompt preview (compact)
+        domain_layout.addWidget(QLabel("Preview:"))
         self.txt_prompt_preview = QTextEdit()
         self.txt_prompt_preview.setReadOnly(True)
-        self.txt_prompt_preview.setMaximumHeight(80)
-        self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề để xem system prompt...")
+        self.txt_prompt_preview.setMaximumHeight(60)
+        self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề...")
         domain_layout.addWidget(self.txt_prompt_preview)
 
         colL.addWidget(domain_group)
 
-        # Row 5b: Download settings
+        # Download settings
         download_group = QGroupBox("⬇️ Tải video")
         download_layout = QVBoxLayout(download_group)
-        download_layout.setContentsMargins(8, 8, 8, 8)
+        download_layout.setContentsMargins(6, 6, 6, 6)
         download_layout.setSpacing(4)
 
-        # Auto-download checkbox
-        self.cb_auto_download = QCheckBox("Tự động tải video")
+        # Row 1: Checkbox + Quality (2 columns)
+        row1 = QHBoxLayout()
+        self.cb_auto_download = QCheckBox("Tự động tải")
         self.cb_auto_download.setChecked(True)
-        download_layout.addWidget(self.cb_auto_download)
-
-        # Quality selector
-        quality_row = QHBoxLayout()
-        quality_row.addWidget(QLabel("Chất lượng:"))
+        row1.addWidget(self.cb_auto_download)
+        row1.addSpacing(8)
+        row1.addWidget(QLabel("Chất lượng:"))
         self.cb_quality = QComboBox()
         self.cb_quality.addItems(["1080p", "720p"])
-        quality_row.addWidget(self.cb_quality, 1)
-        download_layout.addLayout(quality_row)
+        row1.addWidget(self.cb_quality, 1)
+        download_layout.addLayout(row1)
 
-        # Folder path display and change button
+        # Row 2: Folder (compact)
         folder_row = QHBoxLayout()
         self.lbl_download_folder = QLabel("Thư mục: Chưa đặt")
         self.lbl_download_folder.setWordWrap(True)
-        self.lbl_download_folder.setStyleSheet("font-size: 11px; color: #666;")
+        self.lbl_download_folder.setStyleSheet("font-size: 10px; color: #666;")
         folder_row.addWidget(self.lbl_download_folder, 1)
-        self.btn_change_folder = QPushButton("📁 Đổi")
-        self.btn_change_folder.setMaximumWidth(60)
+        self.btn_change_folder = QPushButton("📁")
+        self.btn_change_folder.setMaximumWidth(40)
         folder_row.addWidget(self.btn_change_folder)
         download_layout.addLayout(folder_row)
 
         colL.addWidget(download_group)
-
-        # Voice Settings Group (Voice Prosody & Speaking Style)
-        voice_group = QGroupBox("🎙️ Cài đặt giọng nói & ngữ điệu")
-        voice_layout = QVBoxLayout(voice_group)
-        voice_layout.setContentsMargins(8, 8, 8, 8)
-        voice_layout.setSpacing(6)
-
-        # Speaking style preset selector
-        style_row = QHBoxLayout()
-        style_row.addWidget(QLabel("Phong cách:"))
-        self.cb_speaking_style = QComboBox()
-        # Populate style list from voice_options
-        for key, name, desc in get_style_list():
-            self.cb_speaking_style.addItem(name, key)
-        self.cb_speaking_style.setCurrentIndex(2)  # Default to "storytelling"
-        style_row.addWidget(self.cb_speaking_style, 1)
-        voice_layout.addLayout(style_row)
-
-        # Style description label
-        self.lbl_style_description = QLabel("Giọng sinh động, có cảm xúc, hấp dẫn")
-        self.lbl_style_description.setStyleSheet("font-size: 11px; color: #666; font-style: italic;")
-        self.lbl_style_description.setWordWrap(True)
-        voice_layout.addWidget(self.lbl_style_description)
-
-        # Speaking rate slider
-        rate_row = QHBoxLayout()
-        rate_row.addWidget(QLabel("Tốc độ nói:"))
-        self.slider_rate = QSlider(Qt.Horizontal)
-        self.slider_rate.setRange(50, 200)  # 0.5x to 2.0x (stored as 50-200)
-        self.slider_rate.setValue(100)  # Default 1.0x
-        self.slider_rate.setTickPosition(QSlider.TicksBelow)
-        self.slider_rate.setTickInterval(25)
-        rate_row.addWidget(self.slider_rate, 1)
-        self.lbl_rate = QLabel("1.0x")
-        self.lbl_rate.setMinimumWidth(50)
-        self.lbl_rate.setAlignment(Qt.AlignCenter)
-        rate_row.addWidget(self.lbl_rate)
-        voice_layout.addLayout(rate_row)
-
-        # Pitch slider
-        pitch_row = QHBoxLayout()
-        pitch_row.addWidget(QLabel("Cao độ giọng:"))
-        self.slider_pitch = QSlider(Qt.Horizontal)
-        self.slider_pitch.setRange(-5, 5)  # -5st to +5st
-        self.slider_pitch.setValue(0)  # Default 0st
-        self.slider_pitch.setTickPosition(QSlider.TicksBelow)
-        self.slider_pitch.setTickInterval(1)
-        pitch_row.addWidget(self.slider_pitch, 1)
-        self.lbl_pitch = QLabel("0st")
-        self.lbl_pitch.setMinimumWidth(50)
-        self.lbl_pitch.setAlignment(Qt.AlignCenter)
-        pitch_row.addWidget(self.lbl_pitch)
-        voice_layout.addLayout(pitch_row)
-
-        # Expressiveness slider
-        expr_row = QHBoxLayout()
-        expr_row.addWidget(QLabel("Biểu cảm:"))
-        self.slider_expressiveness = QSlider(Qt.Horizontal)
-        self.slider_expressiveness.setRange(0, 100)  # 0.0 to 1.0 (stored as 0-100)
-        self.slider_expressiveness.setValue(50)  # Default 0.5
-        self.slider_expressiveness.setTickPosition(QSlider.TicksBelow)
-        self.slider_expressiveness.setTickInterval(10)
-        expr_row.addWidget(self.slider_expressiveness, 1)
-        self.lbl_expressiveness = QLabel("0.5")
-        self.lbl_expressiveness.setMinimumWidth(50)
-        self.lbl_expressiveness.setAlignment(Qt.AlignCenter)
-        expr_row.addWidget(self.lbl_expressiveness)
-        voice_layout.addLayout(expr_row)
-
-        # Apply to all scenes checkbox
-        self.cb_apply_voice_all = QCheckBox("Áp dụng cho tất cả cảnh")
-        self.cb_apply_voice_all.setChecked(True)
-        voice_layout.addWidget(self.cb_apply_voice_all)
-
-        colL.addWidget(voice_group)
 
         # Row 6: Single auto button + Stop button (PR#6: Part B #7-8)
         hb = QHBoxLayout()
