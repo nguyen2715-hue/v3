@@ -191,9 +191,27 @@ class _Worker(QObject):
             from services.llm_story_service import generate_script
         except Exception:
             from llm_story_service import generate_script
+        
+        # Build voice config if provided
+        voice_config = None
+        if p.get("tts_provider") and p.get("voice_id"):
+            from services.voice_options import get_voice_config
+            voice_config = get_voice_config(
+                provider=p["tts_provider"],
+                voice_id=p["voice_id"],
+                language_code=p["out_lang_code"]
+            )
+        
+        # Generate script with voice and domain/topic settings
         data = generate_script(
-            idea=p["idea"], style=p["style"], duration_seconds=p["duration"],
-            provider=p["provider"], output_lang=p["out_lang_code"]
+            idea=p["idea"], 
+            style=p["style"], 
+            duration_seconds=p["duration"],
+            provider=p["provider"], 
+            output_lang=p["out_lang_code"],
+            domain=p.get("domain"),
+            topic=p.get("topic"),
+            voice_config=voice_config
         )
         # auto-save to folders
         st = cfg.load()
@@ -217,6 +235,18 @@ class _Worker(QObject):
                 f.write(data.get("outline_vi",""))
             with open(os.path.join(dir_script, "character_bible.json"), "w", encoding="utf-8") as f:
                 json.dump(data.get("character_bible",[]), f, ensure_ascii=False, indent=2)
+            # Save voice config and domain/topic if present
+            if data.get("voice_config"):
+                with open(os.path.join(dir_script, "voice_config.json"), "w", encoding="utf-8") as f:
+                    json.dump(data["voice_config"], f, ensure_ascii=False, indent=2)
+            if p.get("domain") and p.get("topic"):
+                domain_info = {
+                    "domain": p["domain"],
+                    "topic": p["topic"],
+                    "language": p["out_lang_code"]
+                }
+                with open(os.path.join(dir_script, "domain_topic.json"), "w", encoding="utf-8") as f:
+                    json.dump(domain_info, f, ensure_ascii=False, indent=2)
         except Exception as e:
             self.log.emit(f"[WARN] Lưu kịch bản thất bại: {e}")
 
