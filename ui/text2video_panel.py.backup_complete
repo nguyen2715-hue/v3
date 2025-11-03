@@ -112,14 +112,14 @@ class Text2VideoPane(QWidget):
         # Voice Settings Group (Consolidated)
         voice_group = QGroupBox("🎙️ Voice Settings")
         voice_layout = QVBoxLayout(voice_group)
-        voice_layout.setContentsMargins(10, 20, 10, 10)
-        voice_layout.setSpacing(4)
+        voice_layout.setContentsMargins(12, 20, 12, 12)
+        voice_layout.setSpacing(8)
 
         # Row 1: Provider + Voice (2 columns)
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("Provider:"))
         self.cb_tts_provider = QComboBox()
-        from services.voice_options import get_provider_list
+        from services.voice_options import TTS_PROVIDERS, get_provider_list
         for provider_id, provider_name, icon in get_provider_list():
             self.cb_tts_provider.addItem(f"{icon} {provider_name}", provider_id)
         row1.addWidget(self.cb_tts_provider, 1)
@@ -205,14 +205,13 @@ class Text2VideoPane(QWidget):
         self.cb_apply_voice_all.setChecked(True)
         voice_layout.addWidget(self.cb_apply_voice_all)
 
-        voice_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(voice_group)
 
         # Domain & Topic Group
         domain_group = QGroupBox("🎯 Lĩnh vực & Chủ đề")
         domain_layout = QVBoxLayout(domain_group)
-        domain_layout.setContentsMargins(10, 20, 10, 10)
-        domain_layout.setSpacing(4)
+        domain_layout.setContentsMargins(12, 20, 12, 12)
+        domain_layout.setSpacing(8)
 
         # Domain selection
         domain_row = QHBoxLayout()
@@ -242,14 +241,13 @@ class Text2VideoPane(QWidget):
         self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề...")
         domain_layout.addWidget(self.txt_prompt_preview)
 
-        domain_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(domain_group)
 
         # Download settings
         download_group = QGroupBox("⬇️ Tải video")
         download_layout = QVBoxLayout(download_group)
-        download_layout.setContentsMargins(10, 20, 10, 10)
-        download_layout.setSpacing(4)
+        download_layout.setContentsMargins(12, 20, 12, 12)
+        download_layout.setSpacing(8)
 
         # Row 1: Checkbox + Quality (2 columns)
         row1 = QHBoxLayout()
@@ -275,7 +273,6 @@ class Text2VideoPane(QWidget):
         folder_row.addWidget(self.btn_change_folder)
         download_layout.addLayout(folder_row)
 
-        download_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(download_group)
 
         # Row 6: Single auto button + Stop button (PR#6: Part B #7-8)
@@ -428,25 +425,26 @@ class Text2VideoPane(QWidget):
         return '\n'.join(lines)
 
     def _apply_styles(self):
+        
         # Fix QGroupBox title visibility
-        groupbox_style = """
-        QGroupBox {
-            font-weight: bold;
-            font-size: 13px;
-            border: 1px solid #d0d0d0;
-            border-radius: 5px;
-            margin-top: 18px;
-            padding-top: 18px;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            subcontrol-position: top left;
-            padding: 4px 10px;
-            left: 10px;
-            top: 0px;
-        }
-        """
-        self.setStyleSheet(groupbox_style)
+        self.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                margin-top: 12px;
+                padding-top: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 4px 8px;
+                background-color: white;
+                border-radius: 2px;
+            }
+        """)
+        pass v2 handles all styling
+        pass
 
     def _append_log(self, msg):
         self.console.append(msg)

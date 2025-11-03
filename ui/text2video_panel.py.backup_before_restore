@@ -205,7 +205,6 @@ class Text2VideoPane(QWidget):
         self.cb_apply_voice_all.setChecked(True)
         voice_layout.addWidget(self.cb_apply_voice_all)
 
-        voice_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(voice_group)
 
         # Domain & Topic Group
@@ -242,7 +241,6 @@ class Text2VideoPane(QWidget):
         self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề...")
         domain_layout.addWidget(self.txt_prompt_preview)
 
-        domain_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(domain_group)
 
         # Download settings
@@ -275,7 +273,6 @@ class Text2VideoPane(QWidget):
         folder_row.addWidget(self.btn_change_folder)
         download_layout.addLayout(folder_row)
 
-        download_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(download_group)
 
         # Row 6: Single auto button + Stop button (PR#6: Part B #7-8)

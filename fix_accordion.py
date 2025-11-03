@@ -1,151 +1,94 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Fix 2 issues:
-1. Reduce spacer: 20px → 10px (labels too far right)
-2. Fix image generation API call (wrong parameter name)
-"""
-import shutil
-from datetime import datetime
+"""Fix: Restore GroupBox content that disappeared"""
 
-def main():
-    file_path = r"ui\video_ban_hang_panel.py"
+import os
+import shutil
+
+def restore_groupbox_content():
+    """Remove problematic stylesheet and use proper margins only"""
     
-    print("="*70)
-    print(" FIX SPACING + IMAGE API ".center(70, "="))
-    print("="*70)
-    print("\n📋 Fixes:")
-    print("  1. Spacer: 20px → 10px (bring right labels closer)")
-    print("  2. Fix image API call (wrong parameter)")
-    print("="*70)
+    file_path = os.path.join("ui", "text2video_panel.py")
     
-    response = input("\n🚀 Apply? (y/n): ")
-    if response.lower() != 'y':
-        return
-    
-    # Backup
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = f"{file_path}.backup_{timestamp}"
-    shutil.copy2(file_path, backup_path)
-    print(f"\n✓ Backup: {backup_path}")
+    if not os.path.exists(file_path):
+        print(f"❌ File not found: {file_path}")
+        return False
     
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    changes = []
+    # Backup
+    backup = file_path + '.backup_before_restore'
+    shutil.copy2(file_path, backup)
+    print(f"✅ Backup: {backup}")
     
-    # ====================================================================
-    # FIX 1: Reduce spacer column (20px → 10px)
-    # ====================================================================
+    # Fix 1: Remove the problematic stylesheet that's hiding content
+    old_apply_styles = '''    def _apply_styles(self):
+        # Fix QGroupBox title visibility
+        self.setStyleSheet("""
+        QGroupBox {
+            font-weight: bold;
+            font-size: 13px;
+            border: 1px solid #d0d0d0;
+            border-radius: 5px;
+            margin-top: 18px;
+            padding-top: 18px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 4px 10px;
+            left: 10px;
+        }
+        """)'''
     
-    spacer_patterns = [
-        ('form.setColumnMinimumWidth(2, 20)', 'form.setColumnMinimumWidth(2, 10)'),
-        ('setColumnMinimumWidth(2, 20)', 'setColumnMinimumWidth(2, 10)'),
-    ]
+    new_apply_styles = '''    def _apply_styles(self):
+        # Unified theme v2 handles all styling
+        pass'''
     
-    for old, new in spacer_patterns:
-        if old in content:
-            content = content.replace(old, new)
-            changes.append("✓ Fix 1: Spacer 20px → 10px")
-            break
+    if old_apply_styles in content:
+        content = content.replace(old_apply_styles, new_apply_styles)
+        print("✅ Removed problematic stylesheet")
     
-    # ====================================================================
-    # FIX 2: Fix image generation API call
-    # Change: generate_image_with_rate_limit(prompt=...) 
-    # To: generate_image_with_rate_limit(text=...)
-    # ====================================================================
+    # Fix 2: Ensure proper margins (keep existing good values)
+    # These should already be set to (10, 20, 10, 10) from previous fix
     
-    # Pattern 1: Scene images
-    old_api_call = '''                        img_data_url = image_gen_service.generate_image_with_rate_limit(
-                            prompt=prompt,
-                            api_keys=api_keys,
-                            model=model,
-                            aspect_ratio=aspect_ratio,
-                            delay_before=0,  # Explicitly no extra delay
-                            logger=lambda msg: self.progress.emit(msg),
-                        )'''
+    # Fix 3: Add explicit QGroupBox styling that doesn't break children
+    # Find the _build_ui method end and add stylesheet to specific groups
     
-    new_api_call = '''                        img_data_url = image_gen_service.generate_image_with_rate_limit(
-                            text=prompt,  # Fixed: 'prompt' → 'text'
-                            api_keys=api_keys,
-                            model=model,
-                            aspect_ratio=aspect_ratio,
-                            delay_before=0,
-                            logger=lambda msg: self.progress.emit(msg),
-                        )'''
+    # Add individual stylesheets to each GroupBox
+    voice_group_pattern = '        colL.addWidget(voice_group)'
+    if voice_group_pattern in content:
+        new_voice = '''        voice_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
+        colL.addWidget(voice_group)'''
+        content = content.replace(voice_group_pattern, new_voice)
+        print("✅ Added Voice Settings styling")
     
-    if old_api_call in content:
-        content = content.replace(old_api_call, new_api_call)
-        changes.append("✓ Fix 2a: Fixed scene image API call")
+    domain_group_pattern = '        colL.addWidget(domain_group)'
+    if domain_group_pattern in content:
+        new_domain = '''        domain_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
+        colL.addWidget(domain_group)'''
+        content = content.replace(domain_group_pattern, new_domain)
+        print("✅ Added Domain styling")
     
-    # Pattern 2: Thumbnails
-    old_thumb_call = '''                    thumb_data_url = image_gen_service.generate_image_with_rate_limit(
-                        prompt=prompt,
-                        api_keys=api_keys,
-                        model=model,
-                        aspect_ratio=aspect_ratio,
-                        delay_before=0,
-                        logger=lambda msg: self.progress.emit(msg)
-                    )'''
+    download_group_pattern = '        colL.addWidget(download_group)'
+    if download_group_pattern in content:
+        new_download = '''        download_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
+        colL.addWidget(download_group)'''
+        content = content.replace(download_group_pattern, new_download)
+        print("✅ Added Download styling")
     
-    new_thumb_call = '''                    thumb_data_url = image_gen_service.generate_image_with_rate_limit(
-                        text=prompt,  # Fixed: 'prompt' → 'text'
-                        api_keys=api_keys,
-                        model=model,
-                        aspect_ratio=aspect_ratio,
-                        delay_before=0,
-                        logger=lambda msg: self.progress.emit(msg)
-                    )'''
-    
-    if old_thumb_call in content:
-        content = content.replace(old_thumb_call, new_thumb_call)
-        changes.append("✓ Fix 2b: Fixed thumbnail API call")
-    
-    if not changes:
-        print("\n⚠ No changes - patterns not found")
-        print("\nSearching for current state...")
-        
-        # Debug: Show current spacer setting
-        if 'setColumnMinimumWidth(2,' in content:
-            import re
-            match = re.search(r'setColumnMinimumWidth\(2,\s*(\d+)\)', content)
-            if match:
-                print(f"  Current spacer: {match.group(1)}px")
-        
-        # Debug: Show current API call
-        if 'generate_image_with_rate_limit(' in content:
-            lines = content.split('\n')
-            for i, line in enumerate(lines):
-                if 'generate_image_with_rate_limit(' in line:
-                    print(f"\n  Line {i+1}: {line.strip()}")
-                    if i+1 < len(lines):
-                        print(f"  Line {i+2}: {lines[i+1].strip()}")
-                    break
-        
-        return False
-    
-    # Write
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
     
-    print("\n" + "="*70)
-    print("✓ BOTH ISSUES FIXED!")
-    print("="*70)
-    for change in changes:
-        print(change)
-    
-    print(f"\n💾 Backup: {backup_path}")
-    print("\n🧪 Test:")
-    print("  1. py -B main_image2video.py")
-    print("  2. Check right labels position")
-    print("  3. Try 'Viết kịch bản' + 'Tạo ảnh'")
-    
+    print(f"\n✅ Restored content visibility")
     return True
 
-if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
+if __name__ == "__main__":
+    print("🚑 Restoring GroupBox content visibility...\n")
+    
+    if restore_groupbox_content():
+        print("\n🎉 Content should be visible now!")
+        print("\nRestart app:")
+        print("  python -B main_image2video.py")
+    else:
+        print("\n❌ Failed to restore")
