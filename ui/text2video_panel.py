@@ -495,12 +495,14 @@ class Text2VideoPane(QWidget):
     def _fix_combobox_height(self, combobox):
         """Fix ComboBox text clipping by setting minimum height"""
         combobox.setMinimumHeight(28)  # Ensure full text visible
-        # Append padding style - safe since this is called once during initialization
+        # Get existing style and append padding - called once during initialization
         existing_style = combobox.styleSheet()
-        if "QComboBox" not in existing_style:
+        if existing_style:
+            # Append new QComboBox rule after existing styles
             combobox.setStyleSheet(existing_style + " QComboBox { padding: 4px; }")
         else:
-            combobox.setStyleSheet(existing_style + " padding: 4px;")
+            # No existing styles, add directly
+            combobox.setStyleSheet("QComboBox { padding: 4px; }")
 
     def _render_card_text(self, scene:int):
         st = self._cards_state.get(scene, {})
