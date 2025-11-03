@@ -1,6 +1,7 @@
 
 import json
 import os
+import re
 
 from PyQt5.Qt import QDesktopServices
 from PyQt5.QtCore import QLocale, QSize, Qt, QThread, QUrl
@@ -26,6 +27,7 @@ from PyQt5.QtWidgets import (
 )
 
 from utils import config as cfg
+from services.voice_options import get_style_list, get_style_info, SPEAKING_STYLES
 
 from .text2video_panel_impl import _ASPECT_MAP, _LANGS, _VIDEO_MODELS, _Worker, build_prompt_json
 
@@ -145,8 +147,7 @@ class Text2VideoPane(QWidget):
         style_row = QHBoxLayout()
         style_row.addWidget(QLabel("Phong cách:"))
         self.cb_speaking_style = QComboBox()
-        # Import style list from voice_options
-        from services.voice_options import get_style_list
+        # Populate style list from voice_options
         for key, name, desc in get_style_list():
             self.cb_speaking_style.addItem(name, key)
         self.cb_speaking_style.setCurrentIndex(2)  # Default to "storytelling"
@@ -205,7 +206,7 @@ class Text2VideoPane(QWidget):
         voice_layout.addLayout(expr_row)
 
         # Apply to all scenes checkbox
-        self.cb_apply_voice_all = QCheckBox("☑ Áp dụng cho tất cả cảnh")
+        self.cb_apply_voice_all = QCheckBox("Áp dụng cho tất cả cảnh")
         self.cb_apply_voice_all.setChecked(True)
         voice_layout.addWidget(self.cb_apply_voice_all)
 
@@ -749,9 +750,6 @@ class Text2VideoPane(QWidget):
         if not style_key:
             return
         
-        # Import voice options module
-        from services.voice_options import get_style_info, SPEAKING_STYLES
-        
         # Update description
         style_info = get_style_info(style_key)
         self.lbl_style_description.setText(style_info["description"])
@@ -766,7 +764,6 @@ class Text2VideoPane(QWidget):
         
         # Pitch preset extraction
         pitch_str = style_config["google_tts"]["pitch"]
-        import re
         match = re.match(r'([+-]?\d+)st', pitch_str)
         preset_pitch = int(match.group(1)) if match else 0
         self.slider_pitch.setValue(preset_pitch)

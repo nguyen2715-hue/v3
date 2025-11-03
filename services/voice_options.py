@@ -8,6 +8,7 @@ This module provides:
 - Helper functions for rate/pitch calculations
 """
 
+import re
 from typing import Dict, Any, Optional
 
 # Speaking Style Presets (6 presets)
@@ -145,7 +146,6 @@ def _calculate_pitch(preset_pitch: str, adjust_semitones: int = 0) -> str:
     preset_value = 0
     if preset_pitch:
         # Extract number from string like "+2st" or "-1st"
-        import re
         match = re.match(r'([+-]?\d+)st', preset_pitch)
         if match:
             preset_value = int(match.group(1))
