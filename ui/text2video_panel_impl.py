@@ -27,9 +27,28 @@ _LANGS = [
 _VIDEO_MODELS = [
     "veo_3_1_i2v_s_fast_portrait_ultra",
     "veo_3_1_i2v_s_fast_landscape_ultra",
-    "veo_3_1_i2v_xl_portrait",
-    "veo_3_1_i2v_xl_landscape",
+    "veo_3_1_i2v_s_slow_portrait_ultra",
+    "veo_3_1_i2v_s_slow_landscape_ultra",
+    "veo_2_general_002",
+    "veo_2_i2v_001"
 ]
+
+# Mapping for display names
+_MODEL_DISPLAY_NAMES = {
+    "veo_3_1_i2v_s_fast_portrait_ultra": "Veo3.1 i2v Fast Portrait",
+    "veo_3_1_i2v_s_fast_landscape_ultra": "Veo3.1 i2v Fast Landscape",
+    "veo_3_1_i2v_s_slow_portrait_ultra": "Veo3.1 i2v Slow Portrait",
+    "veo_3_1_i2v_s_slow_landscape_ultra": "Veo3.1 i2v Slow Landscape",
+    "veo_2_general_002": "Veo2 General",
+    "veo_2_i2v_001": "Veo2 i2v"
+}
+
+def get_model_key_from_display(display_name):
+    """Convert display name back to API key"""
+    for key, display in _MODEL_DISPLAY_NAMES.items():
+        if display == display_name:
+            return key
+    return display_name  # Fallback
 
 def build_prompt_json(scene_index:int, desc_vi:str, desc_tgt:str, lang_code:str, ratio_str:str, style:str, seconds:int=8, copies:int=1, resolution_hint:str=None, character_bible=None, enhanced_bible=None, voice_settings=None):
     """

@@ -30,7 +30,39 @@ from PyQt5.QtWidgets import (
 from utils import config as cfg
 from services.voice_options import get_style_list, get_style_info, SPEAKING_STYLES
 
-from .text2video_panel_impl import _ASPECT_MAP, _LANGS, _VIDEO_MODELS, _Worker, build_prompt_json
+from .text2video_panel_impl import _ASPECT_MAP, _LANGS, _VIDEO_MODELS, _Worker, build_prompt_json, get_model_key_from_display
+
+
+class CollapsibleGroupBox(QGroupBox):
+    """A GroupBox that can be collapsed/expanded by clicking the title"""
+    
+    def __init__(self, title="", parent=None):
+        super().__init__(title, parent)
+        self.setCheckable(True)
+        self.setChecked(False)  # Default: collapsed
+        self.toggled.connect(self._on_toggle)
+        
+        # Create container widget for content
+        self._content_widget = QWidget()
+        self._content_layout = QVBoxLayout(self._content_widget)
+        self._content_layout.setContentsMargins(10, 20, 10, 10)
+        self._content_layout.setSpacing(6)
+        
+        # Main layout
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 20, 0, 0)
+        main_layout.addWidget(self._content_widget)
+        
+        # Initially hide content
+        self._content_widget.setVisible(False)
+    
+    def content_layout(self):
+        """Return the layout where content should be added"""
+        return self._content_layout
+    
+    def _on_toggle(self, checked):
+        """Show/hide content when toggled"""
+        self._content_widget.setVisible(checked)
 
 
 class Text2VideoPane(QWidget):
@@ -53,24 +85,28 @@ class Text2VideoPane(QWidget):
         # LEFT (1/3) - PR#4: 6-row redesigned layout
         colL = QVBoxLayout(); colL.setSpacing(8)
 
-        # Project name row
-        rowp = QHBoxLayout(); rowp.addWidget(QLabel("<b>Tên dự án:</b>"))
-        self.ed_project = QLineEdit(); self.ed_project.setPlaceholderText("Nhập tên dự án (để trống sẽ tự tạo)")
-        rowp.addWidget(self.ed_project,1); colL.addLayout(rowp)
+        # PROJECT INFO GROUP
+        project_group = QGroupBox("📋 Dự án")
+        project_layout = QVBoxLayout(project_group)
+        project_layout.setContentsMargins(10, 20, 10, 10)
+        project_layout.setSpacing(8)
 
-        # Idea text area
-        colL.addWidget(QLabel("<b>Ý tưởng (đoạn văn):</b>"))
-        self.ed_idea = QTextEdit(); self.ed_idea.setAcceptRichText(False)
+        # Project name (moved from top)
+        proj_row = QHBoxLayout()
+        proj_row.addWidget(QLabel("<b>Tên dự án:</b>"))
+        self.ed_project = QLineEdit()
+        self.ed_project.setPlaceholderText("Nhập tên dự án (để trống sẽ tự tạo)")
+        proj_row.addWidget(self.ed_project, 1)
+        project_layout.addLayout(proj_row)
+
+        # Idea text area (moved from top)
+        project_layout.addWidget(QLabel("<b>Ý tưởng (đoạn văn):</b>"))
+        self.ed_idea = QTextEdit()
+        self.ed_idea.setAcceptRichText(False)
         self.ed_idea.setLocale(QLocale(QLocale.Vietnamese, QLocale.Vietnam))
         self.ed_idea.setPlaceholderText("Nhập ý tưởng thô (<10 từ)…")
         self.ed_idea.setMaximumHeight(100)
-        colL.addWidget(self.ed_idea)
-
-        # Domain & Topic Group (MOVED UP from bottom for better UX)
-        domain_group = QGroupBox("🎯 Lĩnh vực & Chủ đề")
-        domain_layout = QVBoxLayout(domain_group)
-        domain_layout.setContentsMargins(10, 20, 10, 10)
-        domain_layout.setSpacing(6)  # Increased from 4 to 6
+        project_layout.addWidget(self.ed_idea)
 
         # Domain selection
         domain_row = QHBoxLayout()
@@ -84,7 +120,7 @@ class Text2VideoPane(QWidget):
         for domain in get_all_domains():
             self.cb_domain.addItem(domain, domain)
         domain_row.addWidget(self.cb_domain, 1)
-        domain_layout.addLayout(domain_row)
+        project_layout.addLayout(domain_row)
 
         # Topic selection
         topic_row = QHBoxLayout()
@@ -96,73 +132,76 @@ class Text2VideoPane(QWidget):
         self.cb_topic.addItem("(Chọn lĩnh vực để load chủ đề)", "")
         self.cb_topic.setEnabled(False)
         topic_row.addWidget(self.cb_topic, 1)
-        domain_layout.addLayout(topic_row)
+        project_layout.addLayout(topic_row)
 
-        # System prompt preview (compact)
-        lbl_preview = QLabel("Preview:")
-        lbl_preview.setStyleSheet("font-size: 12px;")
-        domain_layout.addWidget(lbl_preview)
-        self.txt_prompt_preview = QTextEdit()
-        self.txt_prompt_preview.setReadOnly(True)
-        self.txt_prompt_preview.setMaximumHeight(60)
-        self.txt_prompt_preview.setStyleSheet("font-size: 11px;")
-        self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề...")
-        domain_layout.addWidget(self.txt_prompt_preview)
+        colL.addWidget(project_group)
 
-        colL.addWidget(domain_group)
+        # VIDEO SETTINGS - Collapsible
+        video_settings_group = CollapsibleGroupBox("⚙️ Cài đặt video")
+        video_layout = video_settings_group.content_layout()
 
-        # Row 1: Video style + Script style
+        # Row 1: Video style + Model
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("<b>Phong cách video:</b>"))
+        row1.addWidget(QLabel("<b>Phong cách:</b>"))
         self.cb_style = QComboBox()
-        self.cb_style.addItems(["Điện ảnh (Cinematic)","Hoạt hình Nhật (Anime)","Tài liệu","Quay thực","3D/CGI","Stop‑motion","Màu nước","Cyberpunk","Noir","Fantasy","Sci‑Fi","Tối giản","Vlog","Doanh nghiệp","Trưng bày sản phẩm","Lifestyle","Thể thao","Du lịch"])
-        row1.addWidget(self.cb_style,1)
-        colL.addLayout(row1)
+        self.cb_style.addItems(["Điện ảnh (Cinematic)", "Anime", "Tài liệu", "Quay thực", "3D/CGI", "Stop-motion"])
+        row1.addWidget(self.cb_style, 1)
+        row1.addSpacing(8)
+        row1.addWidget(QLabel("<b>Model:</b>"))
+        self.cb_model = QComboBox()
+        # SHORT MODEL NAMES
+        self.cb_model.addItems([
+            "Veo3.1 i2v Fast Portrait",
+            "Veo3.1 i2v Fast Landscape", 
+            "Veo3.1 i2v Slow Portrait",
+            "Veo3.1 i2v Slow Landscape",
+            "Veo2 General",
+            "Veo2 i2v"
+        ])
+        row1.addWidget(self.cb_model, 1)
+        video_layout.addLayout(row1)
 
-        # Row 2: Duration + Language
+        # Row 2: Duration + Videos per scene
         row2 = QHBoxLayout()
-        row2.setSpacing(8)
         row2.addWidget(QLabel("<b>Thời lượng (s):</b>"))
-        self.sp_duration = QSpinBox(); self.sp_duration.setRange(3, 3600); self.sp_duration.setValue(100)
-        row2.addWidget(self.sp_duration,1)
-        row2.addSpacing(16)
-        row2.addWidget(QLabel("<b>Ngôn ngữ:</b>"))
-        self.cb_out_lang = QComboBox()
-        for name, code in _LANGS: self.cb_out_lang.addItem(name, code)
-        row2.addWidget(self.cb_out_lang,1)
-        colL.addLayout(row2)
+        self.sp_duration = QSpinBox()
+        self.sp_duration.setRange(3, 3600)
+        self.sp_duration.setValue(100)
+        row2.addWidget(self.sp_duration, 1)
+        row2.addSpacing(8)
+        row2.addWidget(QLabel("<b>Số video/cảnh:</b>"))
+        self.sp_copies = QSpinBox()
+        self.sp_copies.setRange(1, 5)
+        self.sp_copies.setValue(1)
+        row2.addWidget(self.sp_copies, 1)
+        video_layout.addLayout(row2)
 
-        # Row 3: Aspect ratio + Videos per scene
+        # Row 3: Aspect ratio + Language
         row3 = QHBoxLayout()
-        row3.setSpacing(8)
         row3.addWidget(QLabel("<b>Tỉ lệ:</b>"))
-        self.cb_ratio = QComboBox(); self.cb_ratio.addItems(["16:9","9:16","1:1","4:5","21:9"])
-        row3.addWidget(self.cb_ratio,1)
-        row3.addSpacing(16)
-        row3.addWidget(QLabel("<b>Số video/cảnh:</b>"))
-        self.sp_copies = QSpinBox(); self.sp_copies.setRange(1, 5); self.sp_copies.setValue(1)
-        row3.addWidget(self.sp_copies,1)
-        colL.addLayout(row3)
+        self.cb_ratio = QComboBox()
+        self.cb_ratio.addItems(["16:9", "9:16", "1:1", "4:5", "21:9"])
+        row3.addWidget(self.cb_ratio, 1)
+        row3.addSpacing(8)
+        row3.addWidget(QLabel("<b>Ngôn ngữ:</b>"))
+        self.cb_out_lang = QComboBox()
+        for name, code in _LANGS:
+            self.cb_out_lang.addItem(name, code)
+        row3.addWidget(self.cb_out_lang, 1)
+        video_layout.addLayout(row3)
 
-        # Row 4: Video model
-        row4 = QHBoxLayout()
-        row4.addWidget(QLabel("<b>Model tạo video:</b>"))
-        self.cb_model = QComboBox(); self.cb_model.addItems(_VIDEO_MODELS)
-        row4.addWidget(self.cb_model,1)
-        colL.addLayout(row4)
-
-        # Row 5: Up Scale 4K checkbox (PR#4: Added as checkbox)
+        # Row 4: Up Scale 4K
         self.cb_upscale = QCheckBox("Up Scale 4K")
-        self.cb_upscale.setStyleSheet("font-size: 14px; font-weight: 700;")
-        colL.addWidget(self.cb_upscale)
+        self.cb_upscale.setStyleSheet("font-size: 12px;")
+        video_layout.addWidget(self.cb_upscale)
 
-        # Voice Settings Group (Consolidated)
-        voice_group = QGroupBox("🎙️ Voice Settings")
-        voice_layout = QVBoxLayout(voice_group)
-        voice_layout.setContentsMargins(10, 20, 10, 10)
-        voice_layout.setSpacing(6)  # Increased from 4 to 6
+        colL.addWidget(video_settings_group)
 
-        # Row 1: Provider + Voice (2 columns)
+        # VOICE SETTINGS - Collapsible
+        voice_settings_group = CollapsibleGroupBox("🎙️ Cài đặt voice")
+        voice_layout = voice_settings_group.content_layout()
+
+        # Row 1: Provider + Voice
         row1 = QHBoxLayout()
         lbl_provider = QLabel("Provider:")
         lbl_provider.setStyleSheet("font-size: 12px;")
@@ -275,45 +314,20 @@ class Text2VideoPane(QWidget):
         self.cb_apply_voice_all.setChecked(True)
         voice_layout.addWidget(self.cb_apply_voice_all)
 
-        voice_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
-        colL.addWidget(voice_group)
-
-        # Download settings
-        download_group = QGroupBox("⬇️ Tải video")
-        download_layout = QVBoxLayout(download_group)
-        download_layout.setContentsMargins(10, 20, 10, 10)
-        download_layout.setSpacing(6)  # Increased from 4 to 6
-
-        # Row 1: Checkbox + Quality (2 columns)
-        row1 = QHBoxLayout()
-        self.cb_auto_download = QCheckBox("Tự động tải")
-        self.cb_auto_download.setStyleSheet("font-size: 12px;")
+        colL.addWidget(voice_settings_group)
+        
+        # Keep download settings for internal use but don't display them
+        # These are still needed by the backend
+        self.cb_auto_download = QCheckBox()
         self.cb_auto_download.setChecked(True)
-        row1.addWidget(self.cb_auto_download)
-        row1.addSpacing(8)
-        lbl_quality = QLabel("Chất lượng:")
-        lbl_quality.setStyleSheet("font-size: 12px;")
-        row1.addWidget(lbl_quality)
+        self.cb_auto_download.setVisible(False)
         self.cb_quality = QComboBox()
-        self.cb_quality.setStyleSheet("font-size: 12px;")
         self.cb_quality.addItems(["1080p", "720p"])
-        row1.addWidget(self.cb_quality, 1)
-        download_layout.addLayout(row1)
-
-        # Row 2: Folder (compact)
-        folder_row = QHBoxLayout()
-        self.lbl_download_folder = QLabel("Thư mục: Chưa đặt")
-        self.lbl_download_folder.setWordWrap(True)
-        self.lbl_download_folder.setStyleSheet("font-size: 11px; color: #666;")  # Increased from 10px
-        folder_row.addWidget(self.lbl_download_folder, 1)
-        self.btn_change_folder = QPushButton("📁")
-        self.btn_change_folder.setMaximumWidth(40)
-        self.btn_change_folder.setToolTip("Đổi thư mục tải về")
-        folder_row.addWidget(self.btn_change_folder)
-        download_layout.addLayout(folder_row)
-
-        download_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
-        colL.addWidget(download_group)
+        self.cb_quality.setVisible(False)
+        self.lbl_download_folder = QLabel()
+        self.lbl_download_folder.setVisible(False)
+        self.btn_change_folder = QPushButton()
+        self.btn_change_folder.setVisible(False)
 
         # Row 6: Single auto button + Stop button (PR#6: Part B #7-8)
         hb = QHBoxLayout()
@@ -419,7 +433,8 @@ class Text2VideoPane(QWidget):
 
         colR.addWidget(self.result_tabs, 1)
 
-        root.addLayout(colL,2); root.addLayout(colR,3)  # More space for left
+        root.addLayout(colL, 2); root.addLayout(colR, 3)  # Give left more space
+        self.setMinimumWidth(1000)  # Prevent severe clipping
 
         # Wire up (PR#4: Updated for new auto button + stop button)
         self.btn_auto.clicked.connect(self._on_auto_generate)
@@ -578,8 +593,10 @@ class Text2VideoPane(QWidget):
             )
             scenes.append({"prompt": json.dumps(j, ensure_ascii=False, indent=2), "aspect": ratio})
 
+        model_display = self.cb_model.currentText()
+        model_key = get_model_key_from_display(model_display)
         payload=dict(
-            scenes=scenes, copies=self._t2v_get_copies(), model_key=self.cb_model.currentText(),
+            scenes=scenes, copies=self._t2v_get_copies(), model_key=model_key,
             title=self._title, dir_videos=self._ctx.get("dir_videos",""),
             upscale_4k=self.cb_upscale.isChecked(),  # PR#4: Use checkbox instead of button
             auto_download=self.cb_auto_download.isChecked(),  # Part D: Auto-download flag
