@@ -18,10 +18,38 @@ def _n_scenes(total_seconds:int):
 def _mode_from_duration(total_seconds:int):
     return "SHORT" if int(total_seconds) <= 7*60 else "LONG"
 
+# Language code to display name mapping
+LANGUAGE_NAMES = {
+    'vi': 'Vietnamese (Tiếng Việt)',
+    'en': 'English',
+    'ja': 'Japanese (日本語)',
+    'ko': 'Korean (한국어)',
+    'zh': 'Chinese (中文)',
+    'fr': 'French (Français)',
+    'de': 'German (Deutsch)',
+    'es': 'Spanish (Español)',
+    'ru': 'Russian (Русский)',
+    'th': 'Thai (ภาษาไทย)',
+    'id': 'Indonesian (Bahasa Indonesia)'
+}
+
 def _schema_prompt(idea, style_vi, out_lang, n, per, mode):
+    # Get target language display name
+    target_language = LANGUAGE_NAMES.get(out_lang, 'Vietnamese (Tiếng Việt)')
+    
+    # Build language instruction
+    language_instruction = f"""
+IMPORTANT LANGUAGE REQUIREMENT:
+- All narration, dialogue, and voice-over MUST be in {target_language}
+- All scene descriptions should match the cultural context of {target_language}
+- Do NOT mix languages unless specifically requested
+"""
+    
     base_rules = f"""
 Bạn là **Biên kịch Đa năng AI**. Nhận **ý tưởng thô sơ (<10 từ)** và phát triển thành **kịch bản phim/video chuyên nghiệp**.
 Bạn phải **linh hoạt chuyển đổi phong cách** theo độ dài yêu cầu.
+
+{language_instruction}
 
 QUÁN TRIỆT 1 — **Định danh CỐ ĐỊNH nhân vật (Character Bible)**: (2–4 nhân vật)
 Mỗi nhân vật cần:
