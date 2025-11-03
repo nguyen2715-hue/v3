@@ -233,6 +233,13 @@ SPEAKING_STYLES = {
     }
 }
 
+# TTS Provider Options (ID, Display Name)
+TTS_PROVIDERS = [
+    ("google", "Google TTS"),
+    ("elevenlabs", "ElevenLabs"),
+    ("openai", "OpenAI TTS"),
+]
+
 
 def _calculate_rate(preset_rate: str, multiplier: float = 1.0) -> str:
     """Calculate final speaking rate from preset and user multiplier
