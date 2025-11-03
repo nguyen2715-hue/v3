@@ -255,8 +255,7 @@ class _Worker(QObject):
             if rc > 0:
                 # Only create cards for operations that actually exist in the API response
                 # The body dict is updated by client.start_one() with operation_names list
-                actual_ops = body.get("operation_names", [])
-                actual_count = len(actual_ops)
+                actual_count = len(body.get("operation_names", []))
                 
                 if actual_count < copies:
                     self.log.emit(f"[WARN] Scene {scene_idx}: API returned {actual_count} operations but {copies} copies were requested")
