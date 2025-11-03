@@ -39,22 +39,24 @@ class CollapsibleGroupBox(QGroupBox):
     def __init__(self, title="", parent=None):
         super().__init__(title, parent)
         self.setCheckable(True)
-        self.setChecked(False)  # Default: collapsed
-        self.toggled.connect(self._on_toggle)
         
         # Create container widget for content
         self._content_widget = QWidget()
         self._content_layout = QVBoxLayout(self._content_widget)
-        self._content_layout.setContentsMargins(10, 20, 10, 10)
+        self._content_layout.setContentsMargins(10, 15, 10, 8)  # Reduced bottom margin: 10 → 8
         self._content_layout.setSpacing(6)
         
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 20, 0, 0)
+        main_layout.setContentsMargins(0, 15, 0, 5)  # Reduced bottom: 20 → 5
         main_layout.addWidget(self._content_widget)
         
-        # Initially hide content
+        # Initially hide content and set unchecked AFTER layout setup
         self._content_widget.setVisible(False)
+        self.setChecked(False)  # Set AFTER hiding content
+        
+        # Connect toggle AFTER initial setup
+        self.toggled.connect(self._on_toggle)
     
     def content_layout(self):
         """Return the layout where content should be added"""
@@ -88,8 +90,8 @@ class Text2VideoPane(QWidget):
         # PROJECT INFO GROUP
         project_group = QGroupBox("📋 Dự án")
         project_layout = QVBoxLayout(project_group)
-        project_layout.setContentsMargins(10, 20, 10, 10)
-        project_layout.setSpacing(8)
+        project_layout.setContentsMargins(10, 15, 10, 8)  # Reduced margins
+        project_layout.setSpacing(6)  # Reduced spacing
 
         # Project name (moved from top)
         proj_row = QHBoxLayout()
@@ -115,6 +117,7 @@ class Text2VideoPane(QWidget):
         domain_row.addWidget(lbl_domain)
         self.cb_domain = QComboBox()
         self.cb_domain.setStyleSheet("font-size: 12px;")
+        self._fix_combobox_height(self.cb_domain)  # Fix text clipping
         self.cb_domain.addItem("(Không chọn)", "")
         from services.domain_prompts import get_all_domains
         for domain in get_all_domains():
@@ -129,10 +132,14 @@ class Text2VideoPane(QWidget):
         topic_row.addWidget(lbl_topic)
         self.cb_topic = QComboBox()
         self.cb_topic.setStyleSheet("font-size: 12px;")
+        self._fix_combobox_height(self.cb_topic)  # Fix text clipping
         self.cb_topic.addItem("(Chọn lĩnh vực để load chủ đề)", "")
         self.cb_topic.setEnabled(False)
         topic_row.addWidget(self.cb_topic, 1)
         project_layout.addLayout(topic_row)
+
+        # Remove empty space at bottom
+        project_layout.addStretch()
 
         colL.addWidget(project_group)
 
@@ -142,13 +149,19 @@ class Text2VideoPane(QWidget):
 
         # Row 1: Video style + Model
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("<b>Phong cách:</b>"))
+        lbl = QLabel("<b>Phong cách:</b>")
+        lbl.setMinimumHeight(24)  # Ensure bold text visible
+        row1.addWidget(lbl)
         self.cb_style = QComboBox()
+        self._fix_combobox_height(self.cb_style)  # Fix text clipping
         self.cb_style.addItems(["Điện ảnh (Cinematic)", "Anime", "Tài liệu", "Quay thực", "3D/CGI", "Stop-motion"])
         row1.addWidget(self.cb_style, 1)
         row1.addSpacing(8)
-        row1.addWidget(QLabel("<b>Model:</b>"))
+        lbl = QLabel("<b>Model:</b>")
+        lbl.setMinimumHeight(24)  # Ensure bold text visible
+        row1.addWidget(lbl)
         self.cb_model = QComboBox()
+        self._fix_combobox_height(self.cb_model)  # Fix text clipping
         # SHORT MODEL NAMES
         self.cb_model.addItems([
             "Veo3.1 i2v Fast Portrait",
@@ -163,13 +176,17 @@ class Text2VideoPane(QWidget):
 
         # Row 2: Duration + Videos per scene
         row2 = QHBoxLayout()
-        row2.addWidget(QLabel("<b>Thời lượng (s):</b>"))
+        lbl = QLabel("<b>Thời lượng (s):</b>")
+        lbl.setMinimumHeight(24)  # Ensure bold text visible
+        row2.addWidget(lbl)
         self.sp_duration = QSpinBox()
         self.sp_duration.setRange(3, 3600)
         self.sp_duration.setValue(100)
         row2.addWidget(self.sp_duration, 1)
         row2.addSpacing(8)
-        row2.addWidget(QLabel("<b>Số video/cảnh:</b>"))
+        lbl = QLabel("<b>Số video/cảnh:</b>")
+        lbl.setMinimumHeight(24)  # Ensure bold text visible
+        row2.addWidget(lbl)
         self.sp_copies = QSpinBox()
         self.sp_copies.setRange(1, 5)
         self.sp_copies.setValue(1)
@@ -178,13 +195,19 @@ class Text2VideoPane(QWidget):
 
         # Row 3: Aspect ratio + Language
         row3 = QHBoxLayout()
-        row3.addWidget(QLabel("<b>Tỉ lệ:</b>"))
+        lbl = QLabel("<b>Tỉ lệ:</b>")
+        lbl.setMinimumHeight(24)  # Ensure bold text visible
+        row3.addWidget(lbl)
         self.cb_ratio = QComboBox()
+        self._fix_combobox_height(self.cb_ratio)  # Fix text clipping
         self.cb_ratio.addItems(["16:9", "9:16", "1:1", "4:5", "21:9"])
         row3.addWidget(self.cb_ratio, 1)
         row3.addSpacing(8)
-        row3.addWidget(QLabel("<b>Ngôn ngữ:</b>"))
+        lbl = QLabel("<b>Ngôn ngữ:</b>")
+        lbl.setMinimumHeight(24)  # Ensure bold text visible
+        row3.addWidget(lbl)
         self.cb_out_lang = QComboBox()
+        self._fix_combobox_height(self.cb_out_lang)  # Fix text clipping
         for name, code in _LANGS:
             self.cb_out_lang.addItem(name, code)
         row3.addWidget(self.cb_out_lang, 1)
@@ -194,6 +217,9 @@ class Text2VideoPane(QWidget):
         self.cb_upscale = QCheckBox("Up Scale 4K")
         self.cb_upscale.setStyleSheet("font-size: 12px;")
         video_layout.addWidget(self.cb_upscale)
+
+        # Remove empty space at bottom
+        video_layout.addStretch()
 
         colL.addWidget(video_settings_group)
 
@@ -208,6 +234,7 @@ class Text2VideoPane(QWidget):
         row1.addWidget(lbl_provider)
         self.cb_tts_provider = QComboBox()
         self.cb_tts_provider.setStyleSheet("font-size: 12px;")
+        self._fix_combobox_height(self.cb_tts_provider)  # Fix text clipping
         from services.voice_options import TTS_PROVIDERS
         for provider_id, provider_name in TTS_PROVIDERS:
             self.cb_tts_provider.addItem(provider_name, provider_id)
@@ -218,6 +245,7 @@ class Text2VideoPane(QWidget):
         row1.addWidget(lbl_voice)
         self.cb_voice = QComboBox()
         self.cb_voice.setStyleSheet("font-size: 12px;")
+        self._fix_combobox_height(self.cb_voice)  # Fix text clipping
         row1.addWidget(self.cb_voice, 1)
         voice_layout.addLayout(row1)
 
@@ -235,6 +263,7 @@ class Text2VideoPane(QWidget):
         # Prosody section separator
         lbl_prosody = QLabel("<b>Ngữ điệu:</b>")
         lbl_prosody.setStyleSheet("font-size: 12px;")
+        lbl_prosody.setMinimumHeight(24)  # Ensure bold text visible
         voice_layout.addWidget(lbl_prosody)
 
         # Row 3: Style preset (full width)
@@ -244,6 +273,7 @@ class Text2VideoPane(QWidget):
         row3.addWidget(lbl_style)
         self.cb_speaking_style = QComboBox()
         self.cb_speaking_style.setStyleSheet("font-size: 12px;")
+        self._fix_combobox_height(self.cb_speaking_style)  # Fix text clipping
         # Populate style list from voice_options
         for key, name, desc in get_style_list():
             self.cb_speaking_style.addItem(name, key)
@@ -313,6 +343,9 @@ class Text2VideoPane(QWidget):
         self.cb_apply_voice_all = QCheckBox("Áp dụng tất cả cảnh")
         self.cb_apply_voice_all.setChecked(True)
         voice_layout.addWidget(self.cb_apply_voice_all)
+
+        # Remove empty space at bottom
+        voice_layout.addStretch()
 
         colL.addWidget(voice_settings_group)
         
@@ -433,7 +466,7 @@ class Text2VideoPane(QWidget):
 
         colR.addWidget(self.result_tabs, 1)
 
-        root.addLayout(colL, 2); root.addLayout(colR, 3)  # Give left more space
+        root.addLayout(colL, 1); root.addLayout(colR, 2)  # Left: 1, Right: 2 (balanced)
         self.setMinimumWidth(1000)  # Prevent severe clipping
 
         # Wire up (PR#4: Updated for new auto button + stop button)
@@ -459,6 +492,17 @@ class Text2VideoPane(QWidget):
         self.worker = None
         self.thread = None
 
+    def _fix_combobox_height(self, combobox):
+        """Fix ComboBox text clipping by setting minimum height"""
+        combobox.setMinimumHeight(28)  # Ensure full text visible
+        # Get existing style and append padding - called once during initialization
+        existing_style = combobox.styleSheet()
+        if existing_style:
+            # Append new QComboBox rule after existing styles
+            combobox.setStyleSheet(existing_style + " QComboBox { padding: 4px; }")
+        else:
+            # No existing styles, add directly
+            combobox.setStyleSheet("QComboBox { padding: 4px; }")
 
     def _render_card_text(self, scene:int):
         st = self._cards_state.get(scene, {})
