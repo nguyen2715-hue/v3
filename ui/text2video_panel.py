@@ -139,7 +139,7 @@ class Text2VideoPane(QWidget):
         project_layout.addLayout(topic_row)
 
         # Remove empty space at bottom
-        project_layout.addStretch(0)
+        project_layout.addStretch()
 
         colL.addWidget(project_group)
 
@@ -219,7 +219,7 @@ class Text2VideoPane(QWidget):
         video_layout.addWidget(self.cb_upscale)
 
         # Remove empty space at bottom
-        video_layout.addStretch(0)
+        video_layout.addStretch()
 
         colL.addWidget(video_settings_group)
 
@@ -345,7 +345,7 @@ class Text2VideoPane(QWidget):
         voice_layout.addWidget(self.cb_apply_voice_all)
 
         # Remove empty space at bottom
-        voice_layout.addStretch(0)
+        voice_layout.addStretch()
 
         colL.addWidget(voice_settings_group)
         
@@ -495,7 +495,12 @@ class Text2VideoPane(QWidget):
     def _fix_combobox_height(self, combobox):
         """Fix ComboBox text clipping by setting minimum height"""
         combobox.setMinimumHeight(28)  # Ensure full text visible
-        combobox.setStyleSheet(combobox.styleSheet() + "QComboBox { padding: 4px; }")
+        # Append padding style - safe since this is called once during initialization
+        existing_style = combobox.styleSheet()
+        if "QComboBox" not in existing_style:
+            combobox.setStyleSheet(existing_style + " QComboBox { padding: 4px; }")
+        else:
+            combobox.setStyleSheet(existing_style + " padding: 4px;")
 
     def _render_card_text(self, scene:int):
         st = self._cards_state.get(scene, {})
