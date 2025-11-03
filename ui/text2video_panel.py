@@ -102,6 +102,75 @@ class Text2VideoPane(QWidget):
         self.cb_upscale.setStyleSheet("font-size: 14px; font-weight: 700;")
         colL.addWidget(self.cb_upscale)
 
+        # Voice Settings Group
+        voice_group = QGroupBox("🎙️ Voice Settings")
+        voice_layout = QVBoxLayout(voice_group)
+        voice_layout.setContentsMargins(8, 8, 8, 8)
+        voice_layout.setSpacing(4)
+
+        # TTS Provider selection
+        provider_row = QHBoxLayout()
+        provider_row.addWidget(QLabel("TTS Provider:"))
+        self.cb_tts_provider = QComboBox()
+        from services.voice_options import TTS_PROVIDERS
+        for provider_id, provider_name in TTS_PROVIDERS:
+            self.cb_tts_provider.addItem(provider_name, provider_id)
+        provider_row.addWidget(self.cb_tts_provider, 1)
+        voice_layout.addLayout(provider_row)
+
+        # Voice selection
+        voice_row = QHBoxLayout()
+        voice_row.addWidget(QLabel("Voice:"))
+        self.cb_voice = QComboBox()
+        voice_row.addWidget(self.cb_voice, 1)
+        voice_layout.addLayout(voice_row)
+
+        # Custom voice input
+        custom_voice_row = QHBoxLayout()
+        custom_voice_row.addWidget(QLabel("Custom Voice:"))
+        self.ed_custom_voice = QLineEdit()
+        self.ed_custom_voice.setPlaceholderText("Optional - override with custom voice ID")
+        custom_voice_row.addWidget(self.ed_custom_voice, 1)
+        voice_layout.addLayout(custom_voice_row)
+
+        colL.addWidget(voice_group)
+
+        # Domain & Topic Group
+        domain_group = QGroupBox("🎯 Lĩnh vực & Chủ đề")
+        domain_layout = QVBoxLayout(domain_group)
+        domain_layout.setContentsMargins(8, 8, 8, 8)
+        domain_layout.setSpacing(4)
+
+        # Domain selection
+        domain_row = QHBoxLayout()
+        domain_row.addWidget(QLabel("Lĩnh vực:"))
+        self.cb_domain = QComboBox()
+        self.cb_domain.addItem("(Không chọn)", "")
+        from services.domain_prompts import get_all_domains
+        for domain in get_all_domains():
+            self.cb_domain.addItem(domain, domain)
+        domain_row.addWidget(self.cb_domain, 1)
+        domain_layout.addLayout(domain_row)
+
+        # Topic selection
+        topic_row = QHBoxLayout()
+        topic_row.addWidget(QLabel("Chủ đề:"))
+        self.cb_topic = QComboBox()
+        self.cb_topic.addItem("(Chọn lĩnh vực để load chủ đề)", "")
+        self.cb_topic.setEnabled(False)
+        topic_row.addWidget(self.cb_topic, 1)
+        domain_layout.addLayout(topic_row)
+
+        # System prompt preview
+        domain_layout.addWidget(QLabel("📝 System Prompt Preview:"))
+        self.txt_prompt_preview = QTextEdit()
+        self.txt_prompt_preview.setReadOnly(True)
+        self.txt_prompt_preview.setMaximumHeight(80)
+        self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề để xem system prompt...")
+        domain_layout.addWidget(self.txt_prompt_preview)
+
+        colL.addWidget(domain_group)
+
         # Row 5b: Download settings
         download_group = QGroupBox("⬇️ Tải video")
         download_layout = QVBoxLayout(download_group)
@@ -249,6 +318,15 @@ class Text2VideoPane(QWidget):
         self.btn_generate_bible.clicked.connect(self._on_generate_bible)
         self.btn_change_folder.clicked.connect(self._on_change_folder)
 
+        # Wire up voice and domain/topic controls
+        self.cb_tts_provider.currentIndexChanged.connect(self._on_tts_provider_changed)
+        self.cb_out_lang.currentIndexChanged.connect(self._on_language_changed)
+        self.cb_domain.currentIndexChanged.connect(self._on_domain_changed)
+        self.cb_topic.currentIndexChanged.connect(self._on_topic_changed)
+
+        # Initialize voice options for default language
+        self._on_language_changed()
+
         # Keep worker reference
         self.worker = None
         self.thread = None
@@ -304,13 +382,27 @@ class Text2VideoPane(QWidget):
         self.btn_stop.setEnabled(True)
 
         # Step 1: Generate script
+        # Get voice settings
+        tts_provider = self.cb_tts_provider.currentData()
+        voice_id = self.ed_custom_voice.text().strip() or self.cb_voice.currentData()
+        
+        # Get domain/topic settings
+        domain = self.cb_domain.currentData()
+        topic = self.cb_topic.currentData()
+        
         payload = dict(
             project=self.ed_project.text().strip(),
             idea=idea,
             style=self.cb_style.currentText(),
             duration=int(self.sp_duration.value()),
             provider="Gemini 2.5",
-            out_lang_code=self.cb_out_lang.currentData()
+            out_lang_code=self.cb_out_lang.currentData(),
+            # Voice settings
+            tts_provider=tts_provider,
+            voice_id=voice_id,
+            # Domain/topic settings
+            domain=domain or None,
+            topic=topic or None,
         )
         self._append_log("[INFO] Bước 1/3: Sinh kịch bản...")
         self._run_in_thread("script", payload)
@@ -651,3 +743,64 @@ class Text2VideoPane(QWidget):
         except Exception as e:
             self._append_log(f"[ERR] Lỗi tạo Character Bible: {e}")
             QMessageBox.warning(self, "Lỗi", f"Không thể tạo Character Bible: {e}")
+
+    def _on_tts_provider_changed(self):
+        """Handle TTS provider change - update voice list"""
+        provider = self.cb_tts_provider.currentData()
+        language_code = self.cb_out_lang.currentData() or "vi"
+        self._update_voice_list(provider, language_code)
+
+    def _on_language_changed(self):
+        """Handle language change - update voice list for Google TTS"""
+        provider = self.cb_tts_provider.currentData()
+        language_code = self.cb_out_lang.currentData() or "vi"
+        if provider == "google":
+            self._update_voice_list(provider, language_code)
+
+    def _update_voice_list(self, provider, language_code):
+        """Update voice combo box based on provider and language"""
+        from services.voice_options import get_voices_for_provider
+        
+        self.cb_voice.clear()
+        voices = get_voices_for_provider(provider, language_code)
+        for voice_id, display_name in voices:
+            self.cb_voice.addItem(display_name, voice_id)
+
+    def _on_domain_changed(self):
+        """Handle domain selection change - update topic list"""
+        domain = self.cb_domain.currentData()
+        
+        self.cb_topic.clear()
+        self.cb_topic.setEnabled(False)
+        self.txt_prompt_preview.clear()
+        
+        if not domain:
+            self.cb_topic.addItem("(Chọn lĩnh vực để load chủ đề)", "")
+            return
+        
+        from services.domain_prompts import get_topics_for_domain
+        topics = get_topics_for_domain(domain)
+        
+        if topics:
+            self.cb_topic.setEnabled(True)
+            self.cb_topic.addItem("(Chọn chủ đề)", "")
+            for topic in topics:
+                self.cb_topic.addItem(topic, topic)
+
+    def _on_topic_changed(self):
+        """Handle topic selection change - update system prompt preview"""
+        domain = self.cb_domain.currentData()
+        topic = self.cb_topic.currentData()
+        
+        if not domain or not topic:
+            self.txt_prompt_preview.clear()
+            return
+        
+        from services.domain_prompts import get_system_prompt
+        language_code = self.cb_out_lang.currentData() or "vi"
+        
+        # Map language code to vi/en for domain prompts
+        prompt_lang = "vi" if language_code == "vi" else "en"
+        system_prompt = get_system_prompt(domain, topic, prompt_lang)
+        
+        self.txt_prompt_preview.setPlainText(system_prompt)
