@@ -1,0 +1,78 @@
+# -*- coding: utf-8 -*-
+"""
+Domain-specific system prompts for video generation
+Data source: https://docs.google.com/spreadsheets/d/1ohiL6xOBbjC7La2iUdkjrVjG4IEUnVWhI0fRoarD6P0/edit?gid=1507296519#gid=1507296519
+"""
+
+# Domain → Topics → System Prompts mapping
+DOMAIN_PROMPTS = {
+    "Giáo dục & Đào tạo": {
+        "Kỹ năng mềm": "Tạo video hướng dẫn về kỹ năng mềm như giao tiếp, làm việc nhóm, quản lý thời gian. Sử dụng ví dụ thực tế, tình huống minh họa sinh động.",
+        "Học tập hiệu quả": "Hướng dẫn phương pháp học tập hiệu quả, ghi nhớ nhanh, tối ưu hóa thời gian học. Kết hợp nghiên cứu khoa học và kinh nghiệm thực tế.",
+        "Phát triển bản thân": "Nội dung về phát triển tư duy, xây dựng thói quen tốt, tăng năng suất cá nhân. Truyền cảm hứng và hướng dẫn cụ thể.",
+    },
+    
+    "Kinh doanh & Khởi nghiệp": {
+        "Chiến lược kinh doanh": "Phân tích chiến lược kinh doanh, mô hình kinh doanh, case study thành công. Dành cho doanh nghiệp và startup.",
+        "Marketing & Bán hàng": "Hướng dẫn marketing hiện đại, kỹ năng bán hàng, tăng trưởng khách hàng. Tập trung vào digital marketing và content.",
+        "Quản lý & Lãnh đạo": "Kỹ năng quản lý đội nhóm, lãnh đạo hiệu quả, xây dựng văn hóa doanh nghiệp. Dành cho quản lý các cấp.",
+    },
+    
+    "Công nghệ & Lập trình": {
+        "Lập trình cơ bản": "Hướng dẫn lập trình cho người mới bắt đầu. Giải thích khái niệm đơn giản, ví dụ trực quan, thực hành từng bước.",
+        "AI & Machine Learning": "Giới thiệu AI, ML, Deep Learning. Giải thích thuật toán, ứng dụng thực tế, xu hướng công nghệ.",
+        "Web Development": "Hướng dẫn xây dựng website, frontend/backend, frameworks phổ biến. Từ cơ bản đến nâng cao.",
+    },
+    
+    "Sức khỏe & Thể hình": {
+        "Dinh dưỡng khoa học": "Hướng dẫn dinh dưỡng dựa trên khoa học, chế độ ăn lành mạnh, giảm cân hiệu quả.",
+        "Tập luyện & Fitness": "Bài tập thể dục, workout routines, xây dựng cơ bắp, cardio. Hướng dẫn kỹ thuật đúng.",
+        "Sức khỏe tinh thần": "Quản lý stress, thiền định, mindfulness, cân bằng công việc - cuộc sống.",
+    },
+    
+    "Tài chính cá nhân": {
+        "Đầu tư thông minh": "Hướng dẫn đầu tư chứng khoán, quỹ, bất động sản. Phân tích rủi ro, chiến lược dài hạn.",
+        "Quản lý tiền bạc": "Lập ngân sách, tiết kiệm, thoát nợ, xây dựng tài sản. Thực tế và dễ áp dụng.",
+        "Tự do tài chính": "Con đường đạt tự do tài chính, thu nhập thụ động, nghỉ hưu sớm (FIRE).",
+    },
+    
+    "Du lịch & Khám phá": {
+        "Cẩm nang du lịch": "Hướng dẫn du lịch chi tiết, địa điểm nổi tiếng, kinh nghiệm thực tế, mẹo tiết kiệm.",
+        "Văn hóa địa phương": "Khám phá văn hóa, ẩm thực, lịch sử, con người các vùng miền và quốc gia.",
+        "Review & Đánh giá": "Review trung thực về khách sạn, nhà hàng, điểm đến. Đánh giá chi tiết với ảnh/video.",
+    },
+    
+    "Giải trí & Lifestyle": {
+        "Phim & Phê bình": "Review phim, phân tích nội dung sâu, giới thiệu phim hay. Đa dạng thể loại.",
+        "Âm nhạc & Nghệ thuật": "Giới thiệu âm nhạc, nghệ sĩ, phân tích ca khúc, xu hướng nghệ thuật.",
+        "Gaming & Esports": "Game reviews, gameplay, tips & tricks, tin tức esports, cộng đồng game thủ.",
+    },
+}
+
+
+def get_all_domains():
+    """Get list of all domain names"""
+    return list(DOMAIN_PROMPTS.keys())
+
+
+def get_topics_for_domain(domain):
+    """Get list of topics for a specific domain"""
+    return list(DOMAIN_PROMPTS.get(domain, {}).keys())
+
+
+def get_system_prompt(domain, topic):
+    """Get system prompt for a specific domain and topic"""
+    return DOMAIN_PROMPTS.get(domain, {}).get(topic, "")
+
+
+def get_all_prompts():
+    """Get all domain-topic-prompt combinations"""
+    result = []
+    for domain, topics in DOMAIN_PROMPTS.items():
+        for topic, prompt in topics.items():
+            result.append({
+                "domain": domain,
+                "topic": topic,
+                "system_prompt": prompt
+            })
+    return result
