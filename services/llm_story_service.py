@@ -203,11 +203,44 @@ def _call_gemini(prompt, api_key, model="gemini-2.5-flash"):
     else:
         raise RuntimeError("Gemini API failed with unknown error")
 
-def generate_script(idea, style, duration_seconds, provider='Gemini 2.5', api_key=None, output_lang='vi'):
+def generate_script(idea, style, duration_seconds, provider='Gemini 2.5', api_key=None, output_lang='vi', domain=None, topic=None, voice_config=None):
+    """
+    Generate video script with optional domain/topic expertise and voice settings
+    
+    Args:
+        idea: Video idea/concept
+        style: Video style
+        duration_seconds: Total duration
+        provider: LLM provider (Gemini/OpenAI)
+        api_key: Optional API key
+        output_lang: Output language code
+        domain: Optional domain expertise (e.g., "Marketing & Branding")
+        topic: Optional topic within domain (e.g., "Giới thiệu sản phẩm")
+        voice_config: Optional voice configuration dict with provider, voice_id, language_code
+    
+    Returns:
+        Script data dict with scenes, character_bible, etc.
+    """
     gk, ok=_load_keys()
     n, per = _n_scenes(duration_seconds)
     mode = _mode_from_duration(duration_seconds)
+    
+    # Build base prompt
     prompt=_schema_prompt(idea=idea, style_vi=style, out_lang=output_lang, n=n, per=per, mode=mode)
+    
+    # Prepend expert intro if domain/topic selected
+    if domain and topic:
+        try:
+            from services.domain_prompts import build_expert_intro
+            # Map language code to vi/en for domain prompts
+            prompt_lang = "vi" if output_lang == "vi" else "en"
+            expert_intro = build_expert_intro(domain, topic, prompt_lang)
+            prompt = f"{expert_intro}\n\n{prompt}"
+        except Exception as e:
+            # Log but don't fail if domain prompt loading fails
+            print(f"[WARN] Could not load domain prompt: {e}")
+    
+    # Call LLM
     if provider.lower().startswith("gemini"):
         key=api_key or gk
         if not key: raise RuntimeError("Chưa cấu hình Google API Key cho Gemini.")
@@ -218,6 +251,11 @@ def generate_script(idea, style, duration_seconds, provider='Gemini 2.5', api_ke
         # FIXED: Use gpt-4-turbo instead of gpt-5
         res=_call_openai(prompt,key,"gpt-4-turbo")
     if "scenes" not in res: raise RuntimeError("LLM không trả về đúng schema.")
+    
+    # Store voice configuration in result for consistency
+    if voice_config:
+        res["voice_config"] = voice_config
+    
     # ép durations
     for i,d in enumerate(per):
         if i < len(res["scenes"]): res["scenes"][i]["duration"]=int(d)
