@@ -1,104 +1,263 @@
 # -*- coding: utf-8 -*-
-"""
-Voice Options for Text-to-Speech
-Supports Google TTS and ElevenLabs providers
+"""Voice Prosody & Speaking Style Controls
+
+This module provides:
+- Speaking style presets for different contexts
+- SSML generation for Google TTS with prosody controls
+- ElevenLabs voice settings generation
+- Helper functions for rate/pitch calculations
 """
 
-from typing import Dict, List, Tuple
+import re
+from typing import Dict, Any, Optional
 
-# Google TTS Voices Configuration
-GOOGLE_TTS_VOICES = {
-    "vi": [
-        ("vi-VN-Standard-A", "🇻🇳 Nam Miền Bắc (Standard)"),
-        ("vi-VN-Standard-B", "🇻🇳 Nữ Miền Nam (Standard)"),
-        ("vi-VN-Wavenet-A", "🇻🇳 Nam Wavenet (Premium)"),
-        ("vi-VN-Wavenet-B", "🇻🇳 Nữ Wavenet (Premium)"),
-    ],
-    "en": [
-        ("en-US-Neural2-A", "🇺🇸 Male (Neural)"),
-        ("en-US-Neural2-C", "🇺🇸 Female (Neural)"),
-        ("en-GB-Neural2-A", "🇬🇧 Male British (Neural)"),
-        ("en-GB-Neural2-B", "🇬🇧 Female British (Neural)"),
-    ],
-    "ja": [
-        ("ja-JP-Neural2-B", "🇯🇵 Male (Neural)"),
-        ("ja-JP-Neural2-C", "🇯🇵 Female (Neural)"),
-    ],
-    "ko": [
-        ("ko-KR-Neural2-A", "🇰🇷 Male (Neural)"),
-        ("ko-KR-Neural2-B", "🇰🇷 Female (Neural)"),
-    ],
-    "zh": [
-        ("zh-CN-Standard-A", "🇨🇳 Female (Standard)"),
-        ("zh-CN-Standard-B", "🇨🇳 Male (Standard)"),
-    ],
+# Speaking Style Presets (6 presets)
+SPEAKING_STYLES = {
+    "professional_presentation": {
+        "name": "📢 Thuyết trình chuyên nghiệp",
+        "name_en": "Professional Presentation",
+        "description": "Giọng trang trọng, rõ ràng, phù hợp thuyết trình",
+        "google_tts": {
+            "rate": "medium",
+            "pitch": "0st",
+            "volume": "loud"
+        },
+        "elevenlabs": {
+            "stability": 0.85,
+            "similarity_boost": 0.75,
+            "style": 0.3
+        }
+    },
+    "conversational": {
+        "name": "💬 Trò chuyện tự nhiên",
+        "name_en": "Casual Conversation",
+        "description": "Giọng thân thiện, tự nhiên như nói chuyện",
+        "google_tts": {
+            "rate": "medium",
+            "pitch": "+1st",
+            "volume": "medium"
+        },
+        "elevenlabs": {
+            "stability": 0.65,
+            "similarity_boost": 0.80,
+            "style": 0.6
+        }
+    },
+    "storytelling": {
+        "name": "📖 Kể chuyện",
+        "name_en": "Storytelling",
+        "description": "Giọng sinh động, có cảm xúc, hấp dẫn",
+        "google_tts": {
+            "rate": "slow",
+            "pitch": "+2st",
+            "volume": "medium"
+        },
+        "elevenlabs": {
+            "stability": 0.55,
+            "similarity_boost": 0.85,
+            "style": 0.75
+        }
+    },
+    "educational": {
+        "name": "🎓 Giảng dạy",
+        "name_en": "Educational",
+        "description": "Giọng rõ ràng, từ tốn, dễ hiểu",
+        "google_tts": {
+            "rate": "slow",
+            "pitch": "0st",
+            "volume": "loud"
+        },
+        "elevenlabs": {
+            "stability": 0.90,
+            "similarity_boost": 0.70,
+            "style": 0.2
+        }
+    },
+    "enthusiastic": {
+        "name": "🎉 Nhiệt tình",
+        "name_en": "Enthusiastic",
+        "description": "Giọng đầy năng lượng, phấn khởi",
+        "google_tts": {
+            "rate": "fast",
+            "pitch": "+3st",
+            "volume": "loud"
+        },
+        "elevenlabs": {
+            "stability": 0.50,
+            "similarity_boost": 0.85,
+            "style": 0.85
+        }
+    },
+    "calm_relaxed": {
+        "name": "😌 Thư giãn",
+        "name_en": "Calm & Relaxed",
+        "description": "Giọng nhẹ nhàng, êm dịu, thư giãn",
+        "google_tts": {
+            "rate": "slow",
+            "pitch": "-1st",
+            "volume": "soft"
+        },
+        "elevenlabs": {
+            "stability": 0.80,
+            "similarity_boost": 0.75,
+            "style": 0.4
+        }
+    }
 }
 
-# ElevenLabs Voices Configuration
-ELEVENLABS_VOICES = [
-    ("adam", "Adam (Deep & Authoritative)"),
-    ("rachel", "Rachel (Calm Narration)"),
-    ("antoni", "Antoni (Young & Energetic)"),
-    ("bella", "Bella (Soft & Friendly)"),
-    ("elli", "Elli (Warm & Professional)"),
-    ("josh", "Josh (Natural & Conversational)"),
-]
 
-# TTS Providers
-TTS_PROVIDERS = [
-    ("google", "Google TTS"),
-    ("elevenlabs", "ElevenLabs"),
-]
-
-
-def get_voices_for_provider(provider: str, language_code: str = "vi") -> List[Tuple[str, str]]:
-    """
-    Get available voices for a TTS provider
-
+def _calculate_rate(preset_rate: str, multiplier: float = 1.0) -> str:
+    """Calculate final speaking rate from preset and user multiplier
+    
     Args:
-        provider: "google" or "elevenlabs"
-        language_code: Language code (for Google TTS only)
-
+        preset_rate: Preset rate string ("slow", "medium", "fast")
+        multiplier: User adjustment multiplier (0.5 - 2.0)
+    
     Returns:
-        List of (voice_id, display_name) tuples
+        Rate string for SSML (e.g., "80%", "100%", "125%")
     """
-    if provider == "google":
-        return GOOGLE_TTS_VOICES.get(language_code, GOOGLE_TTS_VOICES["vi"])
-    elif provider == "elevenlabs":
-        return ELEVENLABS_VOICES
+    # Map preset to percentage
+    rate_map = {
+        "slow": 75,
+        "medium": 100,
+        "fast": 125
+    }
+    
+    base_rate = rate_map.get(preset_rate, 100)
+    final_rate = int(base_rate * multiplier)
+    
+    # Clamp to reasonable range (50% - 200%)
+    final_rate = max(50, min(200, final_rate))
+    
+    return f"{final_rate}%"
+
+
+def _calculate_pitch(preset_pitch: str, adjust_semitones: int = 0) -> str:
+    """Calculate final pitch from preset and user adjustment
+    
+    Args:
+        preset_pitch: Preset pitch string (e.g., "0st", "+1st", "-2st")
+        adjust_semitones: User adjustment in semitones (-5 to +5)
+    
+    Returns:
+        Pitch string for SSML (e.g., "+2st", "-1st", "0st")
+    """
+    # Parse preset pitch
+    preset_value = 0
+    if preset_pitch:
+        # Extract number from string like "+2st" or "-1st"
+        match = re.match(r'([+-]?\d+)st', preset_pitch)
+        if match:
+            preset_value = int(match.group(1))
+    
+    # Add user adjustment
+    final_pitch = preset_value + adjust_semitones
+    
+    # Clamp to reasonable range (-5 to +5 semitones)
+    final_pitch = max(-5, min(5, final_pitch))
+    
+    # Format as SSML string
+    if final_pitch > 0:
+        return f"+{final_pitch}st"
+    elif final_pitch < 0:
+        return f"{final_pitch}st"
     else:
-        return []
+        return "0st"
 
 
-def get_default_voice(provider: str, language_code: str = "vi") -> str:
-    """
-    Get default voice ID for a provider and language
-
+def get_google_tts_ssml(text: str, voice_id: str, style_preset: str = "storytelling",
+                        rate_multiplier: float = 1.0, pitch_adjust: int = 0,
+                        volume: Optional[str] = None) -> str:
+    """Generate SSML markup for Google TTS with prosody controls
+    
     Args:
-        provider: "google" or "elevenlabs"
-        language_code: Language code (for Google TTS only)
-
+        text: Text to speak
+        voice_id: Google TTS voice ID (e.g., "vi-VN-Wavenet-A")
+        style_preset: Style preset key from SPEAKING_STYLES
+        rate_multiplier: Speaking rate multiplier (0.5 - 2.0, default 1.0)
+        pitch_adjust: Pitch adjustment in semitones (-5 to +5, default 0)
+        volume: Volume override ("soft", "medium", "loud"), or None to use preset
+    
     Returns:
-        Default voice ID
+        SSML markup string for Google TTS
     """
-    voices = get_voices_for_provider(provider, language_code)
-    return voices[0][0] if voices else ""
+    # Get preset configuration
+    style_config = SPEAKING_STYLES.get(style_preset, SPEAKING_STYLES["storytelling"])
+    google_config = style_config["google_tts"]
+    
+    # Calculate final prosody values
+    final_rate = _calculate_rate(google_config["rate"], rate_multiplier)
+    final_pitch = _calculate_pitch(google_config["pitch"], pitch_adjust)
+    final_volume = volume or google_config["volume"]
+    
+    # Escape XML special characters in text
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    
+    # Generate SSML
+    ssml = f"""<speak>
+  <voice name="{voice_id}">
+    <prosody rate="{final_rate}" pitch="{final_pitch}" volume="{final_volume}">
+      {text}
+    </prosody>
+  </voice>
+</speak>"""
+    
+    return ssml
 
 
-def get_voice_config(provider: str, voice_id: str, language_code: str = "vi") -> Dict:
-    """
-    Get voice configuration for script generation
-
+def get_elevenlabs_settings(style_preset: str = "storytelling",
+                            stability_adjust: float = 0.0,
+                            style_adjust: float = 0.0) -> Dict[str, Any]:
+    """Get ElevenLabs voice settings with user adjustments
+    
     Args:
-        provider: "google" or "elevenlabs"
-        voice_id: Voice ID
-        language_code: Language code
-
+        style_preset: Style preset key from SPEAKING_STYLES
+        stability_adjust: Stability adjustment (-0.5 to +0.5, default 0.0)
+        style_adjust: Style adjustment (-0.5 to +0.5, default 0.0)
+    
     Returns:
-        Dict with voice configuration
+        Dictionary of ElevenLabs voice settings
     """
+    # Get preset configuration
+    style_config = SPEAKING_STYLES.get(style_preset, SPEAKING_STYLES["storytelling"])
+    elevenlabs_config = style_config["elevenlabs"]
+    
+    # Apply user adjustments and clamp to valid range [0, 1]
+    final_stability = max(0.0, min(1.0, elevenlabs_config["stability"] + stability_adjust))
+    final_style = max(0.0, min(1.0, elevenlabs_config["style"] + style_adjust))
+    
     return {
-        "provider": provider,
-        "voice_id": voice_id,
-        "language_code": language_code,
+        "stability": final_stability,
+        "similarity_boost": elevenlabs_config["similarity_boost"],
+        "style": final_style,
+        "use_speaker_boost": True
+    }
+
+
+def get_style_list() -> list:
+    """Get list of style presets for UI display
+    
+    Returns:
+        List of tuples (preset_key, display_name, description)
+    """
+    return [
+        (key, config["name"], config["description"])
+        for key, config in SPEAKING_STYLES.items()
+    ]
+
+
+def get_style_info(style_preset: str) -> Dict[str, str]:
+    """Get detailed information about a style preset
+    
+    Args:
+        style_preset: Style preset key
+    
+    Returns:
+        Dictionary with name, name_en, and description
+    """
+    style_config = SPEAKING_STYLES.get(style_preset, SPEAKING_STYLES["storytelling"])
+    return {
+        "name": style_config["name"],
+        "name_en": style_config["name_en"],
+        "description": style_config["description"]
     }
