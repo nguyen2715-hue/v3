@@ -325,75 +325,63 @@ class _Worker(QObject):
 
                 # Check status of first operation (for single copy jobs, there's only one)
                 op_name = op_names[0]
-                v = rs.get(op_name) or {}
-                stt = v.get('status') or 'PROCESSING'
+                op_result = rs.get(op_name) or {}
+                
+                # VEO3 WORKING STRUCTURE: Check raw API response
+                raw_response = op_result.get('raw', {})
+                status = raw_response.get('status', '')
+                
+                scene = card["scene"]
+                copy_num = card["copy"]
 
-                # Update card status
-                card['status']=stt
-                self.job_card.emit(card)
-
-                if stt in ('COMPLETED','DONE'):
-                    # Success - try to download if auto_download enabled
-                    url = (v.get('video_urls') or [None])[0]
-                    if url and auto_download:
-                        fn=f"{title}_canh_{card['scene']}_video_{card['copy']}_{quality}.mp4"
-                        fp=os.path.join(dir_videos, fn)
-                        try:
-                            if self._download(url, fp):
-                                card['path']=fp
-                                card['status']='DOWNLOADED'
-                                th=self._make_thumb(fp, thumbs_dir, card['scene'], card['copy'])
-                                if th:
-                                    card['thumb']=th
-                                self.job_card.emit(card)
-                                sc = card['scene']
-                                cp = card['copy']
-                                self.log.emit(f"[INFO] Đã tải video cảnh {sc} copy {cp}")
-                            else:
-                                scene_id = card['scene']
-                                copy_id = card['copy']
-                                msg = f"[WARN] Tải video thất bại: cảnh {scene_id} copy {copy_id}"
-                                self.log.emit(msg)
-                                card['status']='DOWNLOAD_FAILED'
-                                card['url']=url
-                                self.job_card.emit(card)
-                        except Exception as e:
-                            self.log.emit(f"[ERR] Lỗi tải video cảnh {card['scene']}: {e}")
-                            card['status']='DOWNLOAD_FAILED'
-                            card['url']=url
-                            self.job_card.emit(card)
-                    elif url:
-                        # Not auto-downloading, just store URL
-                        card['url']=url
-                        card['status']='READY'
+                if status == 'MEDIA_GENERATION_STATUS_SUCCESSFUL':
+                    # Extract video URL from correct path
+                    op_metadata = raw_response.get('operation', {}).get('metadata', {})
+                    video_info = op_metadata.get('video', {})
+                    video_url = video_info.get('fifeUrl', '')
+                    
+                    if video_url:
+                        card["status"] = "READY"
+                        card["url"] = video_url
+                        
+                        self.log.emit(f"[SUCCESS] Scene {scene} Copy {copy_num}: Video ready!")
+                        
+                        # Download logic
+                        if auto_download:
+                            fn = f"{title}_scene{scene}_copy{copy_num}.mp4"
+                            fp = os.path.join(dir_videos, fn)
+                            
+                            self.log.emit(f"[INFO] Downloading scene {scene} copy {copy_num}...")
+                            
+                            try:
+                                if self._download(video_url, fp):
+                                    card["status"] = "DOWNLOADED"
+                                    card["path"] = fp
+                                    
+                                    thumb = self._make_thumb(fp, thumbs_dir, scene, copy_num)
+                                    card["thumb"] = thumb
+                                    
+                                    self.log.emit(f"[SUCCESS] ✓ Downloaded: {os.path.basename(fp)}")
+                                else:
+                                    self.log.emit(f"[WARN] Download failed, will retry")
+                                    new_jobs.append(job_info)
+                            except Exception as e:
+                                self.log.emit(f"[ERR] Download error: {e}")
+                                new_jobs.append(job_info)
+                        
                         self.job_card.emit(card)
                     else:
-                        scene_id = card['scene']
-                        self.log.emit(f"[WARN] Video hoàn tất nhưng không có URL: cảnh {scene_id}")
-                        card['status']='DONE_NO_URL'
-                        self.job_card.emit(card)
-                elif stt == 'FAILED':
-                    # Failed - check if we should retry by re-polling status
-                    # Note: For async operations, re-checking status is appropriate as
-                    # the backend may retry internally. We don't regenerate here to avoid
-                    # duplicate API calls and respect backend retry logic.
-                    retries = retry_count.get(op_name, 0)
-                    if retries < max_retries:
-                        retry_count[op_name] = retries + 1
-                        scene_id = card['scene']
-                        retry_info = f"lần {retries + 1}/{max_retries}"
-                        self.log.emit(f"[INFO] Thử lại cảnh {scene_id} ({retry_info})...")
-                        # Keep in job queue for retry
                         new_jobs.append(job_info)
-                    else:
-                        scene_id = card['scene']
-                        copy_id = card['copy']
-                        msg = f"[ERR] Cảnh {scene_id} video {copy_id} thất bại sau {max_retries} lần thử"
-                        self.log.emit(msg)
-                        card['status']='FAILED'
-                        self.job_card.emit(card)
+                
+                elif status == 'MEDIA_GENERATION_STATUS_FAILED':
+                    card["status"] = "FAILED"
+                    self.log.emit(f"[ERR] Scene {scene} Copy {copy_num} FAILED")
+                    self.job_card.emit(card)
+                
                 else:
-                    # Still processing
+                    # Still processing (PENDING, ACTIVE, or other states)
+                    card["status"] = "PROCESSING"
+                    self.job_card.emit(card)
                     new_jobs.append(job_info)
 
             jobs=new_jobs
