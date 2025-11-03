@@ -11,6 +11,134 @@ This module provides:
 import re
 from typing import Dict, Any, Optional
 
+
+# ============================================================================
+# TTS PROVIDERS & VOICE OPTIONS
+# ============================================================================
+
+# TTS Provider configurations
+TTS_PROVIDERS = {
+    "google": {
+        "name": "Google Text-to-Speech",
+        "name_short": "Google TTS",
+        "icon": "🔊",
+        "supports_ssml": True,
+        "supports_prosody": True
+    },
+    "elevenlabs": {
+        "name": "ElevenLabs",
+        "name_short": "ElevenLabs",
+        "icon": "🎙️",
+        "supports_ssml": False,
+        "supports_prosody": True
+    }
+}
+
+# Voice options for each provider
+VOICE_OPTIONS = {
+    "google": {
+        "vi": [
+            {"id": "vi-VN-Wavenet-A", "name": "🇻🇳 Nam Miền Bắc - Wavenet", "gender": "male", "quality": "high"},
+            {"id": "vi-VN-Wavenet-B", "name": "🇻🇳 Nữ Miền Bắc - Wavenet", "gender": "female", "quality": "high"},
+            {"id": "vi-VN-Wavenet-C", "name": "🇻🇳 Nữ Miền Nam - Wavenet", "gender": "female", "quality": "high"},
+            {"id": "vi-VN-Wavenet-D", "name": "🇻🇳 Nam Miền Nam - Wavenet", "gender": "male", "quality": "high"},
+            {"id": "vi-VN-Standard-A", "name": "🇻🇳 Nam Miền Bắc - Standard", "gender": "male", "quality": "standard"},
+            {"id": "vi-VN-Standard-B", "name": "🇻🇳 Nữ Miền Bắc - Standard", "gender": "female", "quality": "standard"}
+        ],
+        "en": [
+            {"id": "en-US-Neural2-A", "name": "🇺🇸 US Male - Neural", "gender": "male", "quality": "high"},
+            {"id": "en-US-Neural2-C", "name": "🇺🇸 US Female - Neural", "gender": "female", "quality": "high"},
+            {"id": "en-GB-Neural2-A", "name": "🇬🇧 UK Female - Neural", "gender": "female", "quality": "high"},
+            {"id": "en-GB-Neural2-B", "name": "🇬🇧 UK Male - Neural", "gender": "male", "quality": "high"}
+        ],
+        "ja": [
+            {"id": "ja-JP-Neural2-B", "name": "🇯🇵 Japanese Female", "gender": "female", "quality": "high"},
+            {"id": "ja-JP-Neural2-C", "name": "🇯🇵 Japanese Male", "gender": "male", "quality": "high"}
+        ],
+        "ko": [
+            {"id": "ko-KR-Neural2-A", "name": "🇰🇷 Korean Female", "gender": "female", "quality": "high"},
+            {"id": "ko-KR-Neural2-B", "name": "🇰🇷 Korean Male", "gender": "male", "quality": "high"}
+        ],
+        "zh": [
+            {"id": "zh-CN-Wavenet-A", "name": "🇨🇳 Chinese Female", "gender": "female", "quality": "high"},
+            {"id": "zh-CN-Wavenet-B", "name": "🇨🇳 Chinese Male", "gender": "male", "quality": "high"}
+        ]
+    },
+    "elevenlabs": {
+        "all": [
+            {"id": "21m00Tcm4TlvDq8ikWAM", "name": "Rachel - Calm Narration", "gender": "female", "description": "Smooth, calming female voice"},
+            {"id": "ErXwobaYiN019PkySvjV", "name": "Antoni - Young & Energetic", "gender": "male", "description": "Youthful, energetic male voice"},
+            {"id": "AZnzlk1XvdvUeBnXmlld", "name": "Domi - Confident & Strong", "gender": "female", "description": "Strong, confident female voice"},
+            {"id": "EXAVITQu4vr4xnSDxMaL", "name": "Bella - Soft & Friendly", "gender": "female", "description": "Soft, friendly female voice"},
+            {"id": "MF3mGyEYCl7XYWbV9V6O", "name": "Elli - Warm & Professional", "gender": "female", "description": "Warm, professional female voice"},
+            {"id": "TxGEqnHWrfWFTfGW9XjX", "name": "Josh - Natural & Conversational", "gender": "male", "description": "Natural, conversational male voice"},
+            {"id": "VR6AewLTigWG4xSOukaG", "name": "Arnold - Deep & Authoritative", "gender": "male", "description": "Deep, authoritative male voice"},
+            {"id": "pNInz6obpgDQGcFmaJgB", "name": "Adam - Deep & Professional", "gender": "male", "description": "Deep, professional male voice"}
+        ]
+    }
+}
+
+def get_provider_list():
+    """Get list of available TTS providers
+    
+    Returns:
+        List of tuples (provider_key, display_name, icon)
+    """
+    return [
+        (key, config["name_short"], config["icon"])
+        for key, config in TTS_PROVIDERS.items()
+    ]
+
+def get_voices_for_provider(provider: str, language: str = "vi"):
+    """Get available voices for a provider and language
+    
+    Args:
+        provider: Provider key ("google" or "elevenlabs")
+        language: Language code (e.g., "vi", "en", "ja")
+    
+    Returns:
+        List of voice dictionaries with id, name, gender, etc.
+    """
+    if provider == "elevenlabs":
+        return VOICE_OPTIONS.get("elevenlabs", {}).get("all", [])
+    return VOICE_OPTIONS.get(provider, {}).get(language, [])
+
+def get_voice_info(provider: str, voice_id: str):
+    """Get detailed information about a specific voice
+    
+    Args:
+        provider: Provider key
+        voice_id: Voice ID
+    
+    Returns:
+        Dictionary with voice info, or None if not found
+    """
+    if provider == "elevenlabs":
+        voices = VOICE_OPTIONS.get("elevenlabs", {}).get("all", [])
+    else:
+        voices = []
+        for lang_voices in VOICE_OPTIONS.get(provider, {}).values():
+            voices.extend(lang_voices)
+    
+    for voice in voices:
+        if voice["id"] == voice_id:
+            return voice
+    return None
+
+def get_default_voice(provider: str, language: str = "vi"):
+    """Get default voice for a provider and language
+    
+    Args:
+        provider: Provider key
+        language: Language code
+    
+    Returns:
+        Voice ID string
+    """
+    voices = get_voices_for_provider(provider, language)
+    return voices[0]["id"] if voices else None
+
+
 # Speaking Style Presets (6 presets)
 SPEAKING_STYLES = {
     "professional_presentation": {

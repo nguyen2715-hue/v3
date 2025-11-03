@@ -64,51 +64,6 @@ class Text2VideoPane(QWidget):
         self.ed_idea.setMaximumHeight(100)
         colL.addWidget(self.ed_idea)
 
-        # Domain & Topic Group (MOVED UP from bottom for better UX)
-        domain_group = QGroupBox("🎯 Lĩnh vực & Chủ đề")
-        domain_layout = QVBoxLayout(domain_group)
-        domain_layout.setContentsMargins(10, 20, 10, 10)
-        domain_layout.setSpacing(6)  # Increased from 4 to 6
-
-        # Domain selection
-        domain_row = QHBoxLayout()
-        lbl_domain = QLabel("Lĩnh vực:")
-        lbl_domain.setStyleSheet("font-size: 12px;")
-        domain_row.addWidget(lbl_domain)
-        self.cb_domain = QComboBox()
-        self.cb_domain.setStyleSheet("font-size: 12px;")
-        self.cb_domain.addItem("(Không chọn)", "")
-        from services.domain_prompts import get_all_domains
-        for domain in get_all_domains():
-            self.cb_domain.addItem(domain, domain)
-        domain_row.addWidget(self.cb_domain, 1)
-        domain_layout.addLayout(domain_row)
-
-        # Topic selection
-        topic_row = QHBoxLayout()
-        lbl_topic = QLabel("Chủ đề:")
-        lbl_topic.setStyleSheet("font-size: 12px;")
-        topic_row.addWidget(lbl_topic)
-        self.cb_topic = QComboBox()
-        self.cb_topic.setStyleSheet("font-size: 12px;")
-        self.cb_topic.addItem("(Chọn lĩnh vực để load chủ đề)", "")
-        self.cb_topic.setEnabled(False)
-        topic_row.addWidget(self.cb_topic, 1)
-        domain_layout.addLayout(topic_row)
-
-        # System prompt preview (compact)
-        lbl_preview = QLabel("Preview:")
-        lbl_preview.setStyleSheet("font-size: 12px;")
-        domain_layout.addWidget(lbl_preview)
-        self.txt_prompt_preview = QTextEdit()
-        self.txt_prompt_preview.setReadOnly(True)
-        self.txt_prompt_preview.setMaximumHeight(60)
-        self.txt_prompt_preview.setStyleSheet("font-size: 11px;")
-        self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề...")
-        domain_layout.addWidget(self.txt_prompt_preview)
-
-        colL.addWidget(domain_group)
-
         # Row 1: Video style + Script style
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("<b>Phong cách video:</b>"))
@@ -157,52 +112,38 @@ class Text2VideoPane(QWidget):
         # Voice Settings Group (Consolidated)
         voice_group = QGroupBox("🎙️ Voice Settings")
         voice_layout = QVBoxLayout(voice_group)
-        voice_layout.setContentsMargins(10, 20, 10, 10)
-        voice_layout.setSpacing(6)  # Increased from 4 to 6
+        voice_layout.setContentsMargins(6, 6, 6, 6)
+        voice_layout.setSpacing(4)
 
         # Row 1: Provider + Voice (2 columns)
         row1 = QHBoxLayout()
-        lbl_provider = QLabel("Provider:")
-        lbl_provider.setStyleSheet("font-size: 12px;")
-        row1.addWidget(lbl_provider)
+        row1.addWidget(QLabel("Provider:"))
         self.cb_tts_provider = QComboBox()
-        self.cb_tts_provider.setStyleSheet("font-size: 12px;")
-        from services.voice_options import TTS_PROVIDERS
-        for provider_id, provider_name in TTS_PROVIDERS:
-            self.cb_tts_provider.addItem(provider_name, provider_id)
+        from services.voice_options import TTS_PROVIDERS, get_provider_list
+        for provider_id, provider_name, icon in get_provider_list():
+            self.cb_tts_provider.addItem(f"{icon} {provider_name}", provider_id)
         row1.addWidget(self.cb_tts_provider, 1)
         row1.addSpacing(8)
-        lbl_voice = QLabel("Voice:")
-        lbl_voice.setStyleSheet("font-size: 12px;")
-        row1.addWidget(lbl_voice)
+        row1.addWidget(QLabel("Voice:"))
         self.cb_voice = QComboBox()
-        self.cb_voice.setStyleSheet("font-size: 12px;")
         row1.addWidget(self.cb_voice, 1)
         voice_layout.addLayout(row1)
 
         # Row 2: Custom voice (full width)
         row2 = QHBoxLayout()
-        lbl_custom = QLabel("Custom:")
-        lbl_custom.setStyleSheet("font-size: 12px;")
-        row2.addWidget(lbl_custom)
+        row2.addWidget(QLabel("Custom:"))
         self.ed_custom_voice = QLineEdit()
-        self.ed_custom_voice.setStyleSheet("font-size: 12px;")
         self.ed_custom_voice.setPlaceholderText("Override voice ID")
         row2.addWidget(self.ed_custom_voice, 1)
         voice_layout.addLayout(row2)
 
         # Prosody section separator
-        lbl_prosody = QLabel("<b>Ngữ điệu:</b>")
-        lbl_prosody.setStyleSheet("font-size: 12px;")
-        voice_layout.addWidget(lbl_prosody)
+        voice_layout.addWidget(QLabel("<b>Ngữ điệu:</b>"))
 
         # Row 3: Style preset (full width)
         row3 = QHBoxLayout()
-        lbl_style = QLabel("Phong cách:")
-        lbl_style.setStyleSheet("font-size: 12px;")
-        row3.addWidget(lbl_style)
+        row3.addWidget(QLabel("Phong cách:"))
         self.cb_speaking_style = QComboBox()
-        self.cb_speaking_style.setStyleSheet("font-size: 12px;")
         # Populate style list from voice_options
         for key, name, desc in get_style_list():
             self.cb_speaking_style.addItem(name, key)
@@ -212,16 +153,14 @@ class Text2VideoPane(QWidget):
 
         # Style description (compact)
         self.lbl_style_description = QLabel("Giọng sinh động, có cảm xúc, hấp dẫn")
-        self.lbl_style_description.setStyleSheet("font-size: 11px; color: #666;")  # Increased from 10px
+        self.lbl_style_description.setStyleSheet("font-size: 10px; color: #666;")
         self.lbl_style_description.setMaximumHeight(20)
         self.lbl_style_description.setWordWrap(True)
         voice_layout.addWidget(self.lbl_style_description)
 
         # Row 4: Rate + Pitch (2 columns)
         row4 = QHBoxLayout()
-        lbl_rate_label = QLabel("Tốc độ:")
-        lbl_rate_label.setStyleSheet("font-size: 12px;")
-        row4.addWidget(lbl_rate_label)
+        row4.addWidget(QLabel("Tốc độ:"))
         self.slider_rate = QSlider(Qt.Horizontal)
         self.slider_rate.setRange(50, 200)  # 0.5x to 2.0x
         self.slider_rate.setValue(100)  # Default 1.0x
@@ -229,14 +168,11 @@ class Text2VideoPane(QWidget):
         self.slider_rate.setTickInterval(25)
         row4.addWidget(self.slider_rate, 1)
         self.lbl_rate = QLabel("1.0x")
-        self.lbl_rate.setMinimumWidth(45)  # Increased from 40
-        self.lbl_rate.setStyleSheet("font-size: 11px;")
+        self.lbl_rate.setMinimumWidth(40)
         self.lbl_rate.setAlignment(Qt.AlignCenter)
         row4.addWidget(self.lbl_rate)
         row4.addSpacing(8)
-        lbl_pitch_label = QLabel("Cao độ:")
-        lbl_pitch_label.setStyleSheet("font-size: 12px;")
-        row4.addWidget(lbl_pitch_label)
+        row4.addWidget(QLabel("Cao độ:"))
         self.slider_pitch = QSlider(Qt.Horizontal)
         self.slider_pitch.setRange(-5, 5)  # -5st to +5st
         self.slider_pitch.setValue(0)  # Default 0st
@@ -244,17 +180,14 @@ class Text2VideoPane(QWidget):
         self.slider_pitch.setTickInterval(1)
         row4.addWidget(self.slider_pitch, 1)
         self.lbl_pitch = QLabel("0st")
-        self.lbl_pitch.setMinimumWidth(45)  # Increased from 40
-        self.lbl_pitch.setStyleSheet("font-size: 11px;")
+        self.lbl_pitch.setMinimumWidth(40)
         self.lbl_pitch.setAlignment(Qt.AlignCenter)
         row4.addWidget(self.lbl_pitch)
         voice_layout.addLayout(row4)
 
         # Row 5: Expressiveness (full width)
         row5 = QHBoxLayout()
-        lbl_expr_label = QLabel("Biểu cảm:")
-        lbl_expr_label.setStyleSheet("font-size: 12px;")
-        row5.addWidget(lbl_expr_label)
+        row5.addWidget(QLabel("Biểu cảm:"))
         self.slider_expressiveness = QSlider(Qt.Horizontal)
         self.slider_expressiveness.setRange(0, 100)  # 0.0 to 1.0
         self.slider_expressiveness.setValue(50)  # Default 0.5
@@ -262,8 +195,7 @@ class Text2VideoPane(QWidget):
         self.slider_expressiveness.setTickInterval(10)
         row5.addWidget(self.slider_expressiveness, 1)
         self.lbl_expressiveness = QLabel("0.5")
-        self.lbl_expressiveness.setMinimumWidth(45)  # Increased from 40
-        self.lbl_expressiveness.setStyleSheet("font-size: 11px;")
+        self.lbl_expressiveness.setMinimumWidth(40)
         self.lbl_expressiveness.setAlignment(Qt.AlignCenter)
         row5.addWidget(self.lbl_expressiveness)
         voice_layout.addLayout(row5)
@@ -273,27 +205,58 @@ class Text2VideoPane(QWidget):
         self.cb_apply_voice_all.setChecked(True)
         voice_layout.addWidget(self.cb_apply_voice_all)
 
-        voice_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(voice_group)
+
+        # Domain & Topic Group
+        domain_group = QGroupBox("🎯 Lĩnh vực & Chủ đề")
+        domain_layout = QVBoxLayout(domain_group)
+        domain_layout.setContentsMargins(6, 6, 6, 6)
+        domain_layout.setSpacing(4)
+
+        # Domain selection
+        domain_row = QHBoxLayout()
+        domain_row.addWidget(QLabel("Lĩnh vực:"))
+        self.cb_domain = QComboBox()
+        self.cb_domain.addItem("(Không chọn)", "")
+        from services.domain_prompts import get_all_domains
+        for domain in get_all_domains():
+            self.cb_domain.addItem(domain, domain)
+        domain_row.addWidget(self.cb_domain, 1)
+        domain_layout.addLayout(domain_row)
+
+        # Topic selection
+        topic_row = QHBoxLayout()
+        topic_row.addWidget(QLabel("Chủ đề:"))
+        self.cb_topic = QComboBox()
+        self.cb_topic.addItem("(Chọn lĩnh vực để load chủ đề)", "")
+        self.cb_topic.setEnabled(False)
+        topic_row.addWidget(self.cb_topic, 1)
+        domain_layout.addLayout(topic_row)
+
+        # System prompt preview (compact)
+        domain_layout.addWidget(QLabel("Preview:"))
+        self.txt_prompt_preview = QTextEdit()
+        self.txt_prompt_preview.setReadOnly(True)
+        self.txt_prompt_preview.setMaximumHeight(60)
+        self.txt_prompt_preview.setPlaceholderText("Chọn lĩnh vực và chủ đề...")
+        domain_layout.addWidget(self.txt_prompt_preview)
+
+        colL.addWidget(domain_group)
 
         # Download settings
         download_group = QGroupBox("⬇️ Tải video")
         download_layout = QVBoxLayout(download_group)
-        download_layout.setContentsMargins(10, 20, 10, 10)
-        download_layout.setSpacing(6)  # Increased from 4 to 6
+        download_layout.setContentsMargins(6, 6, 6, 6)
+        download_layout.setSpacing(4)
 
         # Row 1: Checkbox + Quality (2 columns)
         row1 = QHBoxLayout()
         self.cb_auto_download = QCheckBox("Tự động tải")
-        self.cb_auto_download.setStyleSheet("font-size: 12px;")
         self.cb_auto_download.setChecked(True)
         row1.addWidget(self.cb_auto_download)
         row1.addSpacing(8)
-        lbl_quality = QLabel("Chất lượng:")
-        lbl_quality.setStyleSheet("font-size: 12px;")
-        row1.addWidget(lbl_quality)
+        row1.addWidget(QLabel("Chất lượng:"))
         self.cb_quality = QComboBox()
-        self.cb_quality.setStyleSheet("font-size: 12px;")
         self.cb_quality.addItems(["1080p", "720p"])
         row1.addWidget(self.cb_quality, 1)
         download_layout.addLayout(row1)
@@ -302,7 +265,7 @@ class Text2VideoPane(QWidget):
         folder_row = QHBoxLayout()
         self.lbl_download_folder = QLabel("Thư mục: Chưa đặt")
         self.lbl_download_folder.setWordWrap(True)
-        self.lbl_download_folder.setStyleSheet("font-size: 11px; color: #666;")  # Increased from 10px
+        self.lbl_download_folder.setStyleSheet("font-size: 10px; color: #666;")
         folder_row.addWidget(self.lbl_download_folder, 1)
         self.btn_change_folder = QPushButton("📁")
         self.btn_change_folder.setMaximumWidth(40)
@@ -310,7 +273,6 @@ class Text2VideoPane(QWidget):
         folder_row.addWidget(self.btn_change_folder)
         download_layout.addLayout(folder_row)
 
-        download_group.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; padding-top: 15px; }")
         colL.addWidget(download_group)
 
         # Row 6: Single auto button + Stop button (PR#6: Part B #7-8)
@@ -463,25 +425,8 @@ class Text2VideoPane(QWidget):
         return '\n'.join(lines)
 
     def _apply_styles(self):
-        # Fix QGroupBox title visibility
-        groupbox_style = """
-        QGroupBox {
-            font-weight: bold;
-            font-size: 13px;
-            border: 1px solid #d0d0d0;
-            border-radius: 5px;
-            margin-top: 18px;
-            padding-top: 18px;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            subcontrol-position: top left;
-            padding: 4px 10px;
-            left: 10px;
-            top: 0px;
-        }
-        """
-        self.setStyleSheet(groupbox_style)
+        # Unified theme v2 handles all styling
+        pass
 
     def _append_log(self, msg):
         self.console.append(msg)
